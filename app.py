@@ -35,6 +35,9 @@ def get_ai_response(prompt, conversation_history, system_message):
     messages.extend(conversation_history)
     messages.append({"role": "user", "content": prompt})
 
+    st.write("Messages sent to OpenAI API:")
+    st.write(messages)
+
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
@@ -42,6 +45,7 @@ def get_ai_response(prompt, conversation_history, system_message):
             max_tokens=300
         )
         st.success("OpenAI API 호출 성공")
+        st.write("Response from OpenAI API:")
         st.write(response)
     except Exception as e:
         st.error(f"OpenAI API 호출 실패: {e}")
