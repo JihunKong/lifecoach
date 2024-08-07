@@ -10,15 +10,15 @@ client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 if 'sessions' not in st.session_state:
     st.session_state.sessions = {}
 
-# CSV 파일 불러오기 (실제 환경에서는 파일 경로를 적절히 수정해야 합니다)
+# CSV 파일 불러오기
 @st.cache_data
 def load_questions():
-    df = pd.read_excel("coach.xlsx")  # coach.xlsx 파일을 읽습니다
+    df = pd.read_excel("coach.xlsx")
     questions_by_stage = {}
     for _, row in df.iterrows():
         stage = row['step']
-        questions = row.dropna().tolist()[1:]  # 'step' 열을 제외한 나머지 질문들
-        questions_by_stage[stage] = questions[:3]  # 각 단계별로 3개의 질문만 선택
+        questions = [q for q in row.iloc[1:] if pd.notna(q)]  # 'step' 열을 제외하고 NaN이 아닌 값만 선택
+        questions_by_stage[stage] = questions[:3]  # 각 단계별로 최대 3개의 질문 선택
     return questions_by_stage
 
 questions_by_stage = load_questions()
@@ -50,6 +50,10 @@ def main():
 
     session = st.session_state.sessions[st.session_state.session_id]
 
+    # 디버깅을 위한 정보 출력
+    st.write("Loaded questions:", questions_by_stage)
+    st.write(f"Current stage: {session['stage']}, Question index: {session['question_index']}")
+
     if session["stage"] == 0:
         st.write("안녕하세요. AI 코칭 세션에 오신 것을 환영합니다.")
         st.write("이 세션은 완전히 비공개로 진행되며, 모든 대화 내용은 세션 종료 후 자동으로 삭제됩니다.")
@@ -68,7 +72,7 @@ def main():
         if user_input:
             session["conversation"].append({"role": "user", "content": user_input})
             
-            if session["question_index"] < 3:  # 각 단계에서 3개의 질문만 하도록 수정
+            if session["question_index"] < len(questions_by_stage[session["stage"]]):
                 question = questions_by_stage[session["stage"]][session["question_index"]]
                 prompt = f"다음 질문에 대한 코치의 응답을 생성해주세요. 질문: {question}"
                 ai_response = get_ai_response(prompt, session["conversation"])
