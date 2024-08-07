@@ -11,7 +11,7 @@ if 'sessions' not in st.session_state:
     st.session_state.sessions = {}
 
 # Excel 파일 불러오기
-@st.cache_data
+@st.cache
 def load_questions():
     df = pd.read_excel("coach.xlsx")
     questions_by_stage = {}
