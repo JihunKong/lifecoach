@@ -9,13 +9,13 @@ openai.api_key = api_key
 
 # 세션 상태 초기화
 if 'session_id' not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
+    st.session_state['session_id'] = str(uuid.uuid4())
 if 'stage' not in st.session_state:
-    st.session_state.stage = 0
+    st.session_state['stage'] = 0
 if 'conversation' not in st.session_state:
-    st.session_state.conversation = []
+    st.session_state['conversation'] = []
 if 'agreed' not in st.session_state:
-    st.session_state.agreed = False
+    st.session_state['agreed'] = False
 
 # Excel 파일 불러오기
 @st.cache_data
@@ -73,18 +73,18 @@ def main():
 
     session = st.session_state
 
-    if not session.agreed:
+    if not session['agreed']:
         st.write("안녕하세요. AI 코칭 세션에 오신 것을 환영합니다.")
         st.write("이 세션은 완전히 비공개로 진행되며, 모든 대화 내용은 세션 종료 후 자동으로 삭제됩니다.")
         st.write("코칭을 시작하기 전에 몇 가지 동의를 구하고자 합니다.")
         if st.button("코칭 세션 시작 및 개인정보 보호 정책에 동의합니다"):
-            session.agreed = True
-            session.stage = 1
+            session['agreed'] = True
+            session['stage'] = 1
             initial_question = "코칭 세션을 시작하겠습니다. 먼저, 오늘 어떤 주제에 대해 이야기 나누고 싶으신가요?"
-            session.conversation.append({"role": "assistant", "content": initial_question})
+            session['conversation'].append({"role": "assistant", "content": initial_question})
 
     else:
-        for i, message in enumerate(session.conversation):
+        for i, message in enumerate(session['conversation']):
             if message['role'] == 'user':
                 st.text_area("You:", value=message['content'], height=100, disabled=True, key=f"user_message_{i}")
             else:
@@ -93,16 +93,16 @@ def main():
         user_input = st.text_input("Your response:")
         if st.button("Send"):
             if user_input:
-                session.conversation.append({"role": "user", "content": user_input})
+                session['conversation'].append({"role": "user", "content": user_input})
 
-                current_stage = str(session.stage)
+                current_stage = str(session['stage'])
                 if current_stage in questions_by_stage:
-                    ai_response = generate_coaching_question(current_stage, session.conversation, questions_by_stage[current_stage])
-                    session.conversation.append({"role": "assistant", "content": ai_response})
+                    ai_response = generate_coaching_question(current_stage, session['conversation'], questions_by_stage[current_stage])
+                    session['conversation'].append({"role": "assistant", "content": ai_response})
 
-                    session.stage += 1
+                    session['stage'] += 1
                     next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
-                    session.conversation.append({"role": "assistant", "content": next_question})
+                    session['conversation'].append({"role": "assistant", "content": next_question})
 
 if __name__ == "__main__":
     main()
