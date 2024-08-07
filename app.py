@@ -28,12 +28,12 @@ def get_ai_response(prompt, conversation_history, system_message):
     messages.extend(conversation_history)
     messages.append({"role": "user", "content": prompt})
 
-    response = client.chat_completions.create(
+    response = client.ChatCompletion.create(
         model="gpt-4",
         messages=messages,
         max_tokens=300
     )
-    return response.choices[0].message.content.strip()
+    return response.choices[0].message['content'].strip()
 
 def generate_coaching_question(stage, conversation_history, questions):
     system_message = f"""
@@ -97,13 +97,10 @@ def main():
                     ai_response = generate_coaching_question(current_stage, session["conversation"], questions_by_stage[current_stage])
                     session["conversation"].append({"role": "assistant", "content": ai_response})
 
-                    if current_stage == str(len(questions_by_stage)):
-                        session["stage"] += 1
-                    else:
-                        session["stage"] += 1
-                        next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
-                        session["conversation"].append({"role": "assistant", "content": next_question})
-
+                    session["stage"] += 1
+                    next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
+                    session["conversation"].append({"role": "assistant", "content": next_question})
+                
                 st.experimental_rerun()
 
     else:
