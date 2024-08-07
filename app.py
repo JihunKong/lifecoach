@@ -1,10 +1,11 @@
 import streamlit as st
-from openai import OpenAI
+import openai
 import pandas as pd
 import uuid
 
 # OpenAI 클라이언트 설정
-client = OpenAI(api_key=st.secrets["openai"]["api_key"])
+api_key = st.secrets["openai"]["api_key"]
+openai.api_key = api_key
 
 # 세션 상태 초기화
 if 'sessions' not in st.session_state:
@@ -28,7 +29,7 @@ def get_ai_response(prompt, conversation_history, system_message):
     messages.extend(conversation_history)
     messages.append({"role": "user", "content": prompt})
 
-    response = client.ChatCompletion.create(
+    response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=messages,
         max_tokens=300
