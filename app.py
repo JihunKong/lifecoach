@@ -51,15 +51,16 @@ def main():
 
     session = st.session_state.sessions[st.session_state.session_id]
 
-    if session["stage"] == 0:
+    if not session["agreed"]:
         st.write("안녕하세요. AI 코칭 세션에 오신 것을 환영합니다.")
         st.write("이 세션은 완전히 비공개로 진행되며, 모든 대화 내용은 세션 종료 후 자동으로 삭제됩니다.")
         st.write("코칭을 시작하기 전에 몇 가지 동의를 구하고자 합니다.")
         agree = st.checkbox("코칭 세션 시작 및 개인정보 보호 정책에 동의합니다.")
-        if agree and not session["agreed"]:
+        if agree:
             session["agreed"] = True
             session["stage"] = 1
             session["conversation"].append({"role": "assistant", "content": "코칭 세션을 시작하겠습니다. 먼저, 오늘 어떤 주제에 대해 이야기 나누고 싶으신가요?"})
+            st.experimental_rerun()
 
     elif session["stage"] <= len(questions_by_stage):
         for message in session["conversation"]:
@@ -80,22 +81,26 @@ def main():
                     ai_response = get_ai_response(prompt, session["conversation"])
                     session["conversation"].append({"role": "assistant", "content": ai_response})
                     session["question_index"] += 1
-                else:
-                    session["stage"] += 1
-                    session["question_index"] = 0
-                    if str(session["stage"]) in questions_by_stage:
-                        ai_response = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
-                    else:
-                        ai_response = "모든 단계를 완료했습니다. 코칭 세션을 마무리하고 싶으신가요?"
-                    session["conversation"].append({"role": "assistant", "content": ai_response})
+                    
+                    if session["question_index"] >= len(questions_by_stage[current_stage]):
+                        session["stage"] += 1
+                        session["question_index"] = 0
+                        if str(session["stage"]) in questions_by_stage:
+                            ai_response = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
+                            session["conversation"].append({"role": "assistant", "content": ai_response})
+                
+                st.experimental_rerun()
 
     else:
-        st.write("코칭 세션이 끝났습니다. 세션을 요약해 드리겠습니다.")
-        summary_prompt = "다음은 코칭 세션의 대화 내용입니다. 주요 포인트를 요약해주세요:\n" + "\n".join([f"{m['role']}: {m['content']}" for m in session["conversation"]])
-        summary = get_ai_response(summary_prompt, [])
-        st.text_area("Session Summary:", value=summary, height=300, disabled=True)
-        if st.button("새 세션 시작"):
-            st.session_state.session_id = str(uuid.uuid4())
+        st.write("모든 단계를 완료했습니다. 코칭 세션을 마무리하고 싶으신가요?")
+        if st.button("예"):
+            st.write("코칭 세션이 끝났습니다. 세션을 요약해 드리겠습니다.")
+            summary_prompt = "다음은 코칭 세션의 대화 내용입니다. 주요 포인트를 요약해주세요:\n" + "\n".join([f"{m['role']}: {m['content']}" for m in session["conversation"]])
+            summary = get_ai_response(summary_prompt, [])
+            st.text_area("Session Summary:", value=summary, height=300, disabled=True)
+            if st.button("새 세션 시작"):
+                st.session_state.session_id = str(uuid.uuid4())
+                st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
