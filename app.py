@@ -16,6 +16,8 @@ if 'conversation' not in st.session_state:
     st.session_state['conversation'] = []
 if 'agreed' not in st.session_state:
     st.session_state['agreed'] = False
+if 'waiting_for_response' not in st.session_state:
+    st.session_state['waiting_for_response'] = False
 
 # Excel 파일 불러오기
 @st.cache_data
@@ -100,19 +102,23 @@ def main():
             else:
                 st.text_area("Coach:", value=message['content'], height=100, disabled=True, key=f"coach_message_{i}")
 
-        user_input = st.text_input("Your response:")
-        if st.button("Send"):
-            if user_input:
-                session['conversation'].append({"role": "user", "content": user_input})
+        if not session['waiting_for_response']:
+            user_input = st.text_input("Your response:")
+            if st.button("Send"):
+                if user_input:
+                    session['conversation'].append({"role": "user", "content": user_input})
+                    session['waiting_for_response'] = True
 
-                current_stage = str(session['stage'])
-                if current_stage in questions_by_stage:
-                    ai_response = generate_coaching_question(current_stage, session['conversation'], questions_by_stage[current_stage])
-                    session['conversation'].append({"role": "assistant", "content": ai_response})
+                    current_stage = str(session['stage'])
+                    if current_stage in questions_by_stage:
+                        ai_response = generate_coaching_question(current_stage, session['conversation'], questions_by_stage[current_stage])
+                        session['conversation'].append({"role": "assistant", "content": ai_response})
 
-                    session['stage'] += 1
-                    next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
-                    session['conversation'].append({"role": "assistant", "content": next_question})
+                        session['stage'] += 1
+                        next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
+                        session['conversation'].append({"role": "assistant", "content": next_question})
+                        
+                    session['waiting_for_response'] = False
 
 if __name__ == "__main__":
     main()
