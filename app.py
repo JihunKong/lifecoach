@@ -14,7 +14,13 @@ if 'sessions' not in st.session_state:
 # Excel 파일 불러오기
 @st.cache_data
 def load_questions():
-    df = pd.read_excel("/mnt/data/coach.xlsx")
+    try:
+        df = pd.read_excel("coach.xlsx")  # 경로 문제 확인
+        st.write("Excel 파일 로드 성공")
+    except Exception as e:
+        st.write(f"Excel 파일 로드 실패: {e}")
+        return {}
+
     questions_by_stage = {}
     for _, row in df.iterrows():
         stage = str(row['step'])
@@ -29,11 +35,17 @@ def get_ai_response(prompt, conversation_history, system_message):
     messages.extend(conversation_history)
     messages.append({"role": "user", "content": prompt})
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",
-        messages=messages,
-        max_tokens=300
-    )
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=messages,
+            max_tokens=300
+        )
+        st.write("OpenAI API 호출 성공")
+    except Exception as e:
+        st.write(f"OpenAI API 호출 실패: {e}")
+        return "AI 응답을 가져오는 데 실패했습니다."
+
     return response.choices[0].message['content'].strip()
 
 def generate_coaching_question(stage, conversation_history, questions):
