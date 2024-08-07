@@ -10,7 +10,7 @@ client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 if 'sessions' not in st.session_state:
     st.session_state.sessions = {}
 
-# CSV 파일 불러오기
+# Excel 파일 불러오기
 @st.cache_data
 def load_questions():
     df = pd.read_excel("coach.xlsx")
@@ -29,7 +29,7 @@ def get_ai_response(prompt, conversation_history):
     messages.append({"role": "user", "content": prompt})
     
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4",
         messages=messages,
         max_tokens=150
     )
@@ -58,15 +58,16 @@ def main():
         if agree:
             session["stage"] = 1
             session["conversation"].append({"role": "assistant", "content": "코칭 세션을 시작하겠습니다. 먼저, 오늘 어떤 주제에 대해 이야기 나누고 싶으신가요?"})
+            st.experimental_rerun()
 
-elif session["stage"] <= len(questions_by_stage):
-    for message in session["conversation"]:
-        if message['role'] == 'user':
-            st.text_area("You:", value=message['content'], height=100, disabled=True)
-        else:
-            st.text_area("Coach:", value=message['content'], height=100, disabled=True)
+    elif session["stage"] <= len(questions_by_stage):
+        for message in session["conversation"]:
+            if message['role'] == 'user':
+                st.text_area("You:", value=message['content'], height=100, disabled=True)
+            else:
+                st.text_area("Coach:", value=message['content'], height=100, disabled=True)
 
-        user_input = st.text_input("당신의 응답:")
+        user_input = st.text_input("Your response:")
         if user_input:
             session["conversation"].append({"role": "user", "content": user_input})
             
@@ -91,7 +92,7 @@ elif session["stage"] <= len(questions_by_stage):
         st.write("코칭 세션이 끝났습니다. 세션을 요약해 드리겠습니다.")
         summary_prompt = "다음은 코칭 세션의 대화 내용입니다. 주요 포인트를 요약해주세요:\n" + "\n".join([f"{m['role']}: {m['content']}" for m in session["conversation"]])
         summary = get_ai_response(summary_prompt, [])
-        st.write(summary)
+        st.text_area("Session Summary:", value=summary, height=300, disabled=True)
         if st.button("새 세션 시작"):
             st.session_state.session_id = str(uuid.uuid4())
             st.experimental_rerun()
