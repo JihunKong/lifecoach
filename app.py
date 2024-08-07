@@ -73,13 +73,11 @@ def main():
         st.write("안녕하세요. AI 코칭 세션에 오신 것을 환영합니다.")
         st.write("이 세션은 완전히 비공개로 진행되며, 모든 대화 내용은 세션 종료 후 자동으로 삭제됩니다.")
         st.write("코칭을 시작하기 전에 몇 가지 동의를 구하고자 합니다.")
-        agree = st.checkbox("코칭 세션 시작 및 개인정보 보호 정책에 동의합니다.")
-        if agree:
+        if st.button("코칭 세션 시작 및 개인정보 보호 정책에 동의합니다"):
             session["agreed"] = True
             session["stage"] = 1
             initial_question = "코칭 세션을 시작하겠습니다. 먼저, 오늘 어떤 주제에 대해 이야기 나누고 싶으신가요?"
             session["conversation"].append({"role": "assistant", "content": initial_question})
-            st.experimental_rerun()
 
     elif session["stage"] <= len(questions_by_stage):
         for message in session["conversation"]:
@@ -104,8 +102,6 @@ def main():
                         session["stage"] += 1
                         next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
                         session["conversation"].append({"role": "assistant", "content": next_question})
-                
-                st.experimental_rerun()
 
     else:
         st.write("모든 단계를 완료했습니다. 코칭 세션을 마무리하고 싶으신가요?")
@@ -116,7 +112,6 @@ def main():
             st.text_area("Session Summary:", value=summary, height=300, disabled=True)
             if st.button("새 세션 시작"):
                 st.session_state.session_id = str(uuid.uuid4())
-                st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
