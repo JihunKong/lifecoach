@@ -10,8 +10,11 @@ openai.api_key = api_key
 # 세션 상태 초기화
 if 'session_id' not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
+if 'stage' not in st.session_state:
     st.session_state.stage = 0
+if 'conversation' not in st.session_state:
     st.session_state.conversation = []
+if 'agreed' not in st.session_state:
     st.session_state.agreed = False
 
 # Excel 파일 불러오기
