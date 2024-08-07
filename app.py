@@ -16,24 +16,43 @@ def load_questions():
     df = pd.read_excel("coach.xlsx")
     questions_by_stage = {}
     for _, row in df.iterrows():
-        stage = str(row['step'])  # 단계를 문자열로 변환
+        stage = str(row['step'])
         questions = [q for q in row.iloc[1:] if pd.notna(q)]
-        questions_by_stage[stage] = questions[:3]  # 각 단계별로 최대 3개의 질문 선택
+        questions_by_stage[stage] = questions
     return questions_by_stage
 
 questions_by_stage = load_questions()
 
-def get_ai_response(prompt, conversation_history):
-    messages = [{"role": "system", "content": "당신은 전문적인 코치입니다. 항상 질문을 통해 대화를 이끌어나가며, 직접적인 조언은 하지 않습니다."}]
+def get_ai_response(prompt, conversation_history, system_message):
+    messages = [{"role": "system", "content": system_message}]
     messages.extend(conversation_history)
     messages.append({"role": "user", "content": prompt})
     
     response = client.chat.completions.create(
         model="gpt-4",
         messages=messages,
-        max_tokens=150
+        max_tokens=300
     )
     return response.choices[0].message.content.strip()
+
+def generate_coaching_question(stage, conversation_history, questions):
+    system_message = f"""
+    당신은 전문적인 코치입니다. 현재 코칭의 {stage}단계에 있습니다. 
+    다음 질문 목록을 참고하되, 대화의 흐름과 클라이언트의 답변을 고려하여 
+    가장 적절한 다음 질문을 생성해주세요. 질문 전에 클라이언트의 이전 답변에 대한 
+    간단한 공감과 재진술을 포함해주세요.
+    
+    참고할 질문 목록:
+    {', '.join(questions)}
+    
+    출력 형식:
+    공감과 재진술: [클라이언트의 이전 답변에 대한 공감과 재진술]
+    다음 질문: [생성된 코칭 질문]
+    """
+    
+    prompt = "이전 대화 내용을 바탕으로 적절한 다음 코칭 질문을 생성해주세요."
+    response = get_ai_response(prompt, conversation_history, system_message)
+    return response
 
 def main():
     st.title("AI 코칭 봇")
@@ -44,7 +63,6 @@ def main():
     if st.session_state.session_id not in st.session_state.sessions:
         st.session_state.sessions[st.session_state.session_id] = {
             "stage": 0,
-            "question_index": 0,
             "conversation": [],
             "agreed": False
         }
@@ -59,7 +77,8 @@ def main():
         if agree:
             session["agreed"] = True
             session["stage"] = 1
-            session["conversation"].append({"role": "assistant", "content": "코칭 세션을 시작하겠습니다. 먼저, 오늘 어떤 주제에 대해 이야기 나누고 싶으신가요?"})
+            initial_question = "코칭 세션을 시작하겠습니다. 먼저, 오늘 어떤 주제에 대해 이야기 나누고 싶으신가요?"
+            session["conversation"].append({"role": "assistant", "content": initial_question})
             st.experimental_rerun()
 
     elif session["stage"] <= len(questions_by_stage):
@@ -69,25 +88,22 @@ def main():
             else:
                 st.text_area("Coach:", value=message['content'], height=100, disabled=True)
 
-        user_input = st.text_input("Your response:", key=f"input_{session['stage']}_{session['question_index']}")
-        if st.button("Send", key=f"send_{session['stage']}_{session['question_index']}"):
+        user_input = st.text_input("Your response:", key=f"input_{session['stage']}")
+        if st.button("Send", key=f"send_{session['stage']}"):
             if user_input:
                 session["conversation"].append({"role": "user", "content": user_input})
                 
                 current_stage = str(session["stage"])
-                if current_stage in questions_by_stage and session["question_index"] < len(questions_by_stage[current_stage]):
-                    question = questions_by_stage[current_stage][session["question_index"]]
-                    prompt = f"다음 질문에 대한 코치의 응답을 생성해주세요. 질문: {question}"
-                    ai_response = get_ai_response(prompt, session["conversation"])
+                if current_stage in questions_by_stage:
+                    ai_response = generate_coaching_question(current_stage, session["conversation"], questions_by_stage[current_stage])
                     session["conversation"].append({"role": "assistant", "content": ai_response})
-                    session["question_index"] += 1
                     
-                    if session["question_index"] >= len(questions_by_stage[current_stage]):
+                    if current_stage == str(len(questions_by_stage)):
                         session["stage"] += 1
-                        session["question_index"] = 0
-                        if str(session["stage"]) in questions_by_stage:
-                            ai_response = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
-                            session["conversation"].append({"role": "assistant", "content": ai_response})
+                    else:
+                        session["stage"] += 1
+                        next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
+                        session["conversation"].append({"role": "assistant", "content": next_question})
                 
                 st.experimental_rerun()
 
@@ -96,7 +112,7 @@ def main():
         if st.button("예"):
             st.write("코칭 세션이 끝났습니다. 세션을 요약해 드리겠습니다.")
             summary_prompt = "다음은 코칭 세션의 대화 내용입니다. 주요 포인트를 요약해주세요:\n" + "\n".join([f"{m['role']}: {m['content']}" for m in session["conversation"]])
-            summary = get_ai_response(summary_prompt, [])
+            summary = get_ai_response(summary_prompt, [], "당신은 전문적인 코치입니다. 코칭 세션의 주요 내용을 간략하게 요약해주세요.")
             st.text_area("Session Summary:", value=summary, height=300, disabled=True)
             if st.button("새 세션 시작"):
                 st.session_state.session_id = str(uuid.uuid4())
