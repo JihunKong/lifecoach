@@ -11,7 +11,7 @@ if 'sessions' not in st.session_state:
     st.session_state.sessions = {}
 
 # Excel 파일 불러오기
-@st.cache
+@st.cache_data
 def load_questions():
     df = pd.read_excel("coach.xlsx")
     questions_by_stage = {}
@@ -27,9 +27,9 @@ def get_ai_response(prompt, conversation_history, system_message):
     messages = [{"role": "system", "content": system_message}]
     messages.extend(conversation_history)
     messages.append({"role": "user", "content": prompt})
-    
-    response = client.chat.completions.create(
-        model="gpt-4o",
+
+    response = client.chat_completions.create(
+        model="gpt-4",
         messages=messages,
         max_tokens=300
     )
@@ -91,19 +91,19 @@ def main():
         if st.button("Send", key=f"send_{session['stage']}_{len(session['conversation'])}"):
             if user_input:
                 session["conversation"].append({"role": "user", "content": user_input})
-                
+
                 current_stage = str(session["stage"])
                 if current_stage in questions_by_stage:
                     ai_response = generate_coaching_question(current_stage, session["conversation"], questions_by_stage[current_stage])
                     session["conversation"].append({"role": "assistant", "content": ai_response})
-                    
+
                     if current_stage == str(len(questions_by_stage)):
                         session["stage"] += 1
                     else:
                         session["stage"] += 1
                         next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
                         session["conversation"].append({"role": "assistant", "content": next_question})
-                
+
                 st.experimental_rerun()
 
     else:
