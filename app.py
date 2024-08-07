@@ -14,7 +14,7 @@ if 'sessions' not in st.session_state:
 # Excel 파일 불러오기
 @st.cache_data
 def load_questions():
-    df = pd.read_excel("coach.xlsx")
+    df = pd.read_excel("/mnt/data/coach.xlsx")
     questions_by_stage = {}
     for _, row in df.iterrows():
         stage = str(row['step'])
@@ -101,6 +101,8 @@ def main():
                     session["stage"] += 1
                     next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
                     session["conversation"].append({"role": "assistant", "content": next_question})
+                
+                st.experimental_rerun()
 
     else:
         st.write("모든 단계를 완료했습니다. 코칭 세션을 마무리하고 싶으신가요?")
