@@ -101,8 +101,6 @@ def main():
                     session["stage"] += 1
                     next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
                     session["conversation"].append({"role": "assistant", "content": next_question})
-                
-                st.experimental_rerun()
 
     else:
         st.write("모든 단계를 완료했습니다. 코칭 세션을 마무리하고 싶으신가요?")
