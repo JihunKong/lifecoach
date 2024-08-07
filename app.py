@@ -30,7 +30,7 @@ def get_ai_response(prompt, conversation_history, system_message):
     messages.append({"role": "user", "content": prompt})
 
     response = openai.ChatCompletion.create(
-        model="gpt-4",
+        model="gpt-4o",
         messages=messages,
         max_tokens=300
     )
