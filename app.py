@@ -38,10 +38,10 @@ def get_ai_response(prompt, conversation_history, system_message):
             messages=messages,
             max_tokens=300
         )
-        st.write("OpenAI API 호출 성공")
+        st.success("OpenAI API 호출 성공")
         st.write(response)
     except Exception as e:
-        st.write(f"OpenAI API 호출 실패: {e}")
+        st.error(f"OpenAI API 호출 실패: {e}")
         return "AI 응답을 가져오는 데 실패했습니다."
 
     return response.choices[0].message['content'].strip()
