@@ -38,9 +38,6 @@ def get_ai_response(prompt, conversation_history):
 def main():
     st.title("AI 코칭 봇")
 
-    # 디버깅 정보
-    st.write("Debug - questions_by_stage:", questions_by_stage)
-
     if 'session_id' not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
 
@@ -54,10 +51,6 @@ def main():
 
     session = st.session_state.sessions[st.session_state.session_id]
 
-    # 디버깅 정보
-    st.write("Debug - Current stage:", session["stage"])
-    st.write("Debug - Question index:", session["question_index"])
-
     if session["stage"] == 0:
         st.write("안녕하세요. AI 코칭 세션에 오신 것을 환영합니다.")
         st.write("이 세션은 완전히 비공개로 진행되며, 모든 대화 내용은 세션 종료 후 자동으로 삭제됩니다.")
@@ -67,7 +60,6 @@ def main():
             session["agreed"] = True
             session["stage"] = 1
             session["conversation"].append({"role": "assistant", "content": "코칭 세션을 시작하겠습니다. 먼저, 오늘 어떤 주제에 대해 이야기 나누고 싶으신가요?"})
-            st.experimental_rerun()
 
     elif session["stage"] <= len(questions_by_stage):
         for message in session["conversation"]:
@@ -76,27 +68,26 @@ def main():
             else:
                 st.text_area("Coach:", value=message['content'], height=100, disabled=True)
 
-        user_input = st.text_input("Your response:")
-        if user_input:
-            session["conversation"].append({"role": "user", "content": user_input})
-            
-            current_stage = str(session["stage"])
-            if current_stage in questions_by_stage and session["question_index"] < len(questions_by_stage[current_stage]):
-                question = questions_by_stage[current_stage][session["question_index"]]
-                prompt = f"다음 질문에 대한 코치의 응답을 생성해주세요. 질문: {question}"
-                ai_response = get_ai_response(prompt, session["conversation"])
-                session["conversation"].append({"role": "assistant", "content": ai_response})
-                session["question_index"] += 1
-            else:
-                session["stage"] += 1
-                session["question_index"] = 0
-                if str(session["stage"]) in questions_by_stage:
-                    ai_response = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
+        user_input = st.text_input("Your response:", key=f"input_{session['stage']}_{session['question_index']}")
+        if st.button("Send", key=f"send_{session['stage']}_{session['question_index']}"):
+            if user_input:
+                session["conversation"].append({"role": "user", "content": user_input})
+                
+                current_stage = str(session["stage"])
+                if current_stage in questions_by_stage and session["question_index"] < len(questions_by_stage[current_stage]):
+                    question = questions_by_stage[current_stage][session["question_index"]]
+                    prompt = f"다음 질문에 대한 코치의 응답을 생성해주세요. 질문: {question}"
+                    ai_response = get_ai_response(prompt, session["conversation"])
+                    session["conversation"].append({"role": "assistant", "content": ai_response})
+                    session["question_index"] += 1
                 else:
-                    ai_response = "모든 단계를 완료했습니다. 코칭 세션을 마무리하고 싶으신가요?"
-                session["conversation"].append({"role": "assistant", "content": ai_response})
-
-            st.experimental_rerun()
+                    session["stage"] += 1
+                    session["question_index"] = 0
+                    if str(session["stage"]) in questions_by_stage:
+                        ai_response = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
+                    else:
+                        ai_response = "모든 단계를 완료했습니다. 코칭 세션을 마무리하고 싶으신가요?"
+                    session["conversation"].append({"role": "assistant", "content": ai_response})
 
     else:
         st.write("코칭 세션이 끝났습니다. 세션을 요약해 드리겠습니다.")
@@ -105,7 +96,6 @@ def main():
         st.text_area("Session Summary:", value=summary, height=300, disabled=True)
         if st.button("새 세션 시작"):
             st.session_state.session_id = str(uuid.uuid4())
-            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
