@@ -20,7 +20,13 @@ if 'agreed' not in st.session_state:
 # Excel 파일 불러오기
 @st.cache_data
 def load_questions():
-    df = pd.read_excel("coach.xlsx")
+    try:
+        df = pd.read_excel("coach.xlsx")
+        st.write("Excel 파일 로드 성공")
+    except Exception as e:
+        st.error(f"Excel 파일 로드 실패: {e}")
+        return {}
+
     questions_by_stage = {}
     for _, row in df.iterrows():
         stage = str(row['step'])
