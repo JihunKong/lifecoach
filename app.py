@@ -50,10 +50,6 @@ def main():
 
     session = st.session_state.sessions[st.session_state.session_id]
 
-    # 디버깅을 위한 정보 출력
-    st.write("Loaded questions:", questions_by_stage)
-    st.write(f"Current stage: {session['stage']}, Question index: {session['question_index']}")
-
     if session["stage"] == 0:
         st.write("안녕하세요. AI 코칭 세션에 오신 것을 환영합니다.")
         st.write("이 세션은 완전히 비공개로 진행되며, 모든 대화 내용은 세션 종료 후 자동으로 삭제됩니다.")
@@ -63,10 +59,12 @@ def main():
             session["stage"] = 1
             session["conversation"].append({"role": "assistant", "content": "코칭 세션을 시작하겠습니다. 먼저, 오늘 어떤 주제에 대해 이야기 나누고 싶으신가요?"})
 
-    elif session["stage"] <= len(questions_by_stage):
-        st.write("현재 단계:", session["stage"])
-        for message in session["conversation"]:
-            st.write(f"{'You' if message['role'] == 'user' else 'Coach'}: {message['content']}")
+elif session["stage"] <= len(questions_by_stage):
+    for message in session["conversation"]:
+        if message['role'] == 'user':
+            st.text_area("You:", value=message['content'], height=100, disabled=True)
+        else:
+            st.text_area("Coach:", value=message['content'], height=100, disabled=True)
 
         user_input = st.text_input("당신의 응답:")
         if user_input:
