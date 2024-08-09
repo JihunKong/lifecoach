@@ -1,124 +1,97 @@
-import streamlit as st
 import openai
+import streamlit as st
 import pandas as pd
 import uuid
 
-# OpenAI 클라이언트 설정
-api_key = st.secrets["openai"]["api_key"]
-openai.api_key = api_key
+# Streamlit secrets에서 OpenAI API 키 가져오기
+openai.api_key = st.secrets["openai"]["api_key"]
 
-# 세션 상태 초기화
+# 코칭 질문 엑셀 파일 읽기
+coach_df = pd.read_excel("coach.xlsx")
+
+# Streamlit 웹 애플리케이션 제목
+st.title("GPT 기반 TEACHer 코칭 시스템")
+
+# UUID를 사용하여 개별 대화 세션 관리
 if 'session_id' not in st.session_state:
-    st.session_state['session_id'] = str(uuid.uuid4())
-if 'stage' not in st.session_state:
-    st.session_state['stage'] = 0
-if 'conversation' not in st.session_state:
-    st.session_state['conversation'] = []
-if 'agreed' not in st.session_state:
-    st.session_state['agreed'] = False
-if 'waiting_for_response' not in st.session_state:
-    st.session_state['waiting_for_response'] = False
+    st.session_state.session_id = str(uuid.uuid4())
 
-# Excel 파일 불러오기
-@st.cache_data
-def load_questions():
-    try:
-        df = pd.read_excel("coach.xlsx")
-        st.write("Excel 파일 로드 성공")
-    except Exception as e:
-        st.error(f"Excel 파일 로드 실패: {e}")
-        return {}
+session_id = st.session_state.session_id
 
-    questions_by_stage = {}
-    for _, row in df.iterrows():
-        stage = str(row['step'])
-        questions = [q for q in row.iloc[1:] if pd.notna(q)]
-        questions_by_stage[stage] = questions
-    return questions_by_stage
+# TEACHer 모델의 단계
+stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Havest', 'Empower&Reflect']
 
-questions_by_stage = load_questions()
+# 현재 단계 설정
+if f'{session_id}_stage' not in st.session_state:
+    st.session_state[f'{session_id}_stage'] = 'Trust'
+if f'{session_id}_question_count' not in st.session_state:
+    st.session_state[f'{session_id}_question_count'] = 0
 
-def get_ai_response(prompt, conversation_history, system_message):
-    messages = [{"role": "system", "content": system_message}]
-    messages.extend(conversation_history)
-    messages.append({"role": "user", "content": prompt})
+# 단계별 코칭 질문을 GPT로 선택하는 함수
+def suggest_coaching_question(stage, previous_answers):
+    questions = coach_df[coach_df['Stage'] == stage]['Question'].tolist()
+    prompt = f"Given the user's previous answers: {previous_answers}, select the most appropriate question from the following options:\n"
+    for question in questions:
+        prompt += f"- {question}\n"
+    prompt += "Select the most appropriate question."
 
-    st.write("Messages sent to OpenAI API:")
-    st.write(messages)
+    response = openai.Completion.create(
+        engine="gpt-4",
+        prompt=prompt,
+        max_tokens=60,
+        n=1,
+        stop=None,
+        temperature=0.5,
+    )
+    selected_question = response.choices[0].text.strip()
+    return selected_question
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=messages,
-            max_tokens=300
+# 현재 단계의 질문 선택
+current_stage = st.session_state[f'{session_id}_stage']
+previous_answers = st.session_state.get(f'{session_id}_answers', [])
+current_question_count = st.session_state[f'{session_id}_question_count']
+
+if current_question_count < 3:
+    current_question = suggest_coaching_question(current_stage, previous_answers)
+    st.write(f"**{current_stage} 단계의 질문 {current_question_count + 1}:** {current_question}")
+else:
+    st.write(f"**{current_stage} 단계의 모든 질문이 완료되었습니다. 다음 단계로 넘어갑니다.**")
+
+# 사용자 입력 받기
+user_input = st.text_area("이 질문에 대해 답변해보세요:")
+
+if st.button("다음 질문"):
+    if user_input:
+        # 사용자의 답변 저장
+        previous_answers.append(user_input)
+        st.session_state[f'{session_id}_answers'] = previous_answers
+
+        # GPT-4에 입력을 전송하여 사용자의 답변 요약 생성
+        summary_prompt = f"사용자가 다음과 같은 내용을 말했습니다: '{user_input}' 이 내용을 간단하게 요약해 주세요."
+        response = openai.Completion.create(
+            engine="gpt-4",
+            prompt=summary_prompt,
+            max_tokens=60
         )
-        st.success("OpenAI API 호출 성공")
-        st.write("Response from OpenAI API:")
-        st.write(response)
-    except Exception as e:
-        st.error(f"OpenAI API 호출 실패: {e}")
-        return "AI 응답을 가져오는 데 실패했습니다."
+        summary = response.choices[0].text.strip()
 
-    return response.choices[0].message['content'].strip()
-
-def generate_coaching_question(stage, conversation_history, questions):
-    system_message = f"""
-    당신은 전문적인 코치입니다. 현재 코칭의 {stage}단계에 있습니다. 
-    다음 질문 목록을 참고하되, 대화의 흐름과 클라이언트의 답변을 고려하여 
-    가장 적절한 다음 질문을 생성해주세요. 질문 전에 클라이언트의 이전 답변에 대한 
-    간단한 공감과 재진술을 포함해주세요.
-    
-    참고할 질문 목록:
-    {', '.join(questions)}
-    
-    출력 형식:
-    공감과 재진술: [클라이언트의 이전 답변에 대한 공감과 재진술]
-    다음 질문: [생성된 코칭 질문]
-    """
-    
-    prompt = "이전 대화 내용을 바탕으로 적절한 다음 코칭 질문을 생성해주세요."
-    response = get_ai_response(prompt, conversation_history, system_message)
-    return response
-
-def main():
-    st.title("AI 코칭 봇")
-
-    session = st.session_state
-
-    if not session['agreed']:
-        st.write("안녕하세요. AI 코칭 세션에 오신 것을 환영합니다.")
-        st.write("이 세션은 완전히 비공개로 진행되며, 모든 대화 내용은 세션 종료 후 자동으로 삭제됩니다.")
-        st.write("코칭을 시작하기 전에 몇 가지 동의를 구하고자 합니다.")
-        if st.button("코칭 세션 시작 및 개인정보 보호 정책에 동의합니다"):
-            session['agreed'] = True
-            session['stage'] = 1
-            initial_question = "코칭 세션을 시작하겠습니다. 먼저, 오늘 어떤 주제에 대해 이야기 나누고 싶으신가요?"
-            session['conversation'].append({"role": "assistant", "content": initial_question})
-
-    else:
-        for i, message in enumerate(session['conversation']):
-            if message['role'] == 'user':
-                st.text_area("You:", value=message['content'], height=100, disabled=True, key=f"user_message_{i}")
+        # 요약된 내용을 피드백으로 출력
+        st.write("**코치의 재진술:**")
+        st.write(summary)
+        
+        # 질문 횟수 증가 또는 다음 단계로 진행
+        st.session_state[f'{session_id}_question_count'] += 1
+        if st.session_state[f'{session_id}_question_count'] >= 3:
+            current_stage_index = stages.index(current_stage)
+            if current_stage_index < len(stages) - 1:
+                st.session_state[f'{session_id}_stage'] = stages[current_stage_index + 1]
+                st.session_state[f'{session_id}_question_count'] = 0
+                st.session_state[f'{session_id}_answers'] = []
             else:
-                st.text_area("Coach:", value=message['content'], height=100, disabled=True, key=f"coach_message_{i}")
+                st.write("모든 단계가 완료되었습니다. 코칭이 종료되었습니다.")
+    else:
+        st.write("먼저 답변을 입력하세요!")
 
-        if not session['waiting_for_response']:
-            user_input = st.text_input("Your response:")
-            if st.button("Send"):
-                if user_input:
-                    session['conversation'].append({"role": "user", "content": user_input})
-                    session['waiting_for_response'] = True
-
-                    current_stage = str(session['stage'])
-                    if current_stage in questions_by_stage:
-                        ai_response = generate_coaching_question(current_stage, session['conversation'], questions_by_stage[current_stage])
-                        session['conversation'].append({"role": "assistant", "content": ai_response})
-
-                        session['stage'] += 1
-                        next_question = "다음 단계로 넘어가겠습니다. 준비되셨나요?"
-                        session['conversation'].append({"role": "assistant", "content": next_question})
-                        
-                    session['waiting_for_response'] = False
-
-if __name__ == "__main__":
-    main()
+# 사용자 안내
+st.write("이 코칭 시스템은 질문과 간단한 재진술을 통해 귀하의 자기 성찰을 지원합니다.")
+st.write(f"현재 세션 ID: {session_id}")
