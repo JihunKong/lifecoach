@@ -1,10 +1,11 @@
-import openai
+from openai import OpenAI
 import streamlit as st
 import pandas as pd
 import uuid
 
-# OpenAI API 키 설정
-openai.api_key = st.secrets["openai"]["api_key"]
+# Streamlit secrets에서 OpenAI API 키 가져오기
+api_key = st.secrets["openai"]["api_key"]
+client = OpenAI(api_key)
 
 # 코칭 질문 엑셀 파일 읽기
 coach_df = pd.read_excel('coach.xlsx')
@@ -39,15 +40,13 @@ def suggest_coaching_question(stage, previous_answers):
         prompt += f"- {question}\n"
     prompt += "Select the most appropriate question."
 
-    response = openai.Completion.create(
-        engine="gpt-4",
-        prompt=prompt,
-        max_tokens=60,
-        n=1,
-        stop=None,
-        temperature=0.5,
+    completion = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
     )
-    selected_question = response.choices[0].text.strip()
+    selected_question = completion.choices[0].message['content'].strip()
     return selected_question
 
 # 현재 단계의 질문 선택
@@ -72,12 +71,13 @@ if st.button("다음 질문"):
 
         # GPT-4에 입력을 전송하여 사용자의 답변 요약 생성
         summary_prompt = f"사용자가 다음과 같은 내용을 말했습니다: '{user_input}' 이 내용을 간단하게 요약해 주세요."
-        response = openai.Completion.create(
-            engine="gpt-4",
-            prompt=summary_prompt,
-            max_tokens=60
+        completion = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "user", "content": summary_prompt}
+            ]
         )
-        summary = response.choices[0].text.strip()
+        summary = completion.choices[0].message['content'].strip()
 
         # 요약된 내용을 피드백으로 출력
         st.write("**코치의 재진술:**")
