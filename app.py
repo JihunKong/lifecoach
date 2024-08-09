@@ -47,7 +47,6 @@ def suggest_coaching_question(stage, previous_answers):
         completion = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are a helpful AI assistant tasked with selecting appropriate coaching questions."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -82,7 +81,6 @@ if st.button("다음 질문"):
             completion = client.chat.completions.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are a helpful AI assistant tasked with summarizing user responses."},
                     {"role": "user", "content": summary_prompt}
                 ]
             )
