@@ -4,8 +4,7 @@ import uuid
 from openai import OpenAI
 
 # Streamlit secrets에서 OpenAI API 키 가져오기
-api_key = st.secrets["openai"]["api_key"]
-client = OpenAI(api_key=api_key)
+client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
 # 코칭 질문 엑셀 파일 읽기
 @st.cache_data
