@@ -3,11 +3,11 @@ import streamlit as st
 import pandas as pd
 import uuid
 
-# Streamlit secrets에서 OpenAI API 키 가져오기
+# OpenAI API 키 설정
 openai.api_key = st.secrets["openai"]["api_key"]
 
 # 코칭 질문 엑셀 파일 읽기
-coach_df = pd.read_excel('/mnt/data/coach.xlsx')
+coach_df = pd.read_excel('coach.xlsx')
 
 # Streamlit 웹 애플리케이션 제목
 st.title("GPT 기반 TEACHer 코칭 시스템")
