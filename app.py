@@ -45,8 +45,9 @@ def suggest_coaching_question(stage, previous_answers):
     
     try:
         completion = client.chat.completions.create(
-            model="gpt-4",  # 올바른 모델 이름으로 수정
+            model="gpt-4",
             messages=[
+                {"role": "system", "content": "You are a helpful AI assistant tasked with selecting appropriate coaching questions."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -79,8 +80,9 @@ if st.button("다음 질문"):
         summary_prompt = f"사용자가 다음과 같은 내용을 말했습니다: '{user_input}' 이 내용을 간단하게 요약해 주세요."
         try:
             completion = client.chat.completions.create(
-                model="gpt-4",  # 올바른 모델 이름으로 수정
+                model="gpt-4",
                 messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant tasked with summarizing user responses."},
                     {"role": "user", "content": summary_prompt}
                 ]
             )
