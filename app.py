@@ -29,7 +29,9 @@ if f'{session_id}_question_count' not in st.session_state:
 
 # 단계별 코칭 질문을 GPT로 선택하는 함수
 def suggest_coaching_question(stage, previous_answers):
-    questions = coach_df[coach_df['step'].str.contains(stage)]['Question1':'Question15'].values.flatten().tolist()
+    # 'Question1'부터 'Question15'까지 열을 선택합니다.
+    question_columns = [f'Question{i}' for i in range(1, 16)]
+    questions = coach_df[coach_df['step'].str.contains(stage)][question_columns].values.flatten().tolist()
     questions = [q for q in questions if pd.notnull(q)]
     
     prompt = f"Given the user's previous answers: {previous_answers}, select the most appropriate question from the following options:\n"
