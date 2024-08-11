@@ -15,7 +15,7 @@ def init_openai():
         return OpenAI(api_key=st.secrets["openai"]["api_key"])
     except Exception as e:
         st.error(f"OpenAI 클라이언트 초기화 실패: {str(e)}")
-        return None
+        raise
 
 client = init_openai()
 
@@ -28,7 +28,7 @@ def init_pinecone():
         return pc, index
     except Exception as e:
         st.error(f"Pinecone 초기화 실패: {str(e)}")
-        return None, None
+        raise
 
 pc, index = init_pinecone()
 
@@ -39,7 +39,7 @@ def load_sentence_transformer():
         return SentenceTransformer('all-mpnet-base-v2')
     except Exception as e:
         st.error(f"Sentence Transformer 모델 로드 실패: {str(e)}")
-        return None
+        raise
 
 model = load_sentence_transformer()
 
@@ -64,32 +64,30 @@ coach_df = load_coach_data()
 
 # GPT를 사용한 코칭 대화 생성 함수
 def generate_coach_response(conversation, current_stage, question_count):
-    stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
-    available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
-    available_questions = [q for q in available_questions if pd.notnull(q)]
-    
-    recent_conversation = " ".join(conversation[-5:])
-    query_vector = create_vector(recent_conversation)
     try:
+        stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
+        available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
+        available_questions = [q for q in available_questions if pd.notnull(q)]
+        
+        recent_conversation = " ".join(conversation[-5:])
+        query_vector = create_vector(recent_conversation)
+        
         results = index.query(vector=query_vector, top_k=3, include_metadata=True)
         similar_conversations = [item['metadata']['conversation'] for item in results['matches']]
-    except Exception as e:
-        similar_conversations = []
-    
-    prompt = f"""You are an empathetic life coach using the TEACHer model. 
-    Current stage: {current_stage}
-    Question count: {question_count}
-    Previous conversation: {conversation[-5:] if len(conversation) > 5 else conversation}
-    Similar past conversations: {similar_conversations}
-    
-    Based on the user's responses and similar past conversations, generate a natural, empathetic response.
-    Then, ask a single follow-up question related to the current stage.
-    Choose from or create a question similar to these for the current stage:
-    {available_questions}
-    
-    Your response should be in Korean and should flow naturally without any labels or markers."""
-    
-    try:
+        
+        prompt = f"""You are an empathetic life coach using the TEACHer model. 
+        Current stage: {current_stage}
+        Question count: {question_count}
+        Previous conversation: {conversation[-5:] if len(conversation) > 5 else conversation}
+        Similar past conversations: {similar_conversations}
+        
+        Based on the user's responses and similar past conversations, generate a natural, empathetic response.
+        Then, ask a single follow-up question related to the current stage.
+        Choose from or create a question similar to these for the current stage:
+        {available_questions}
+        
+        Your response should be in Korean and should flow naturally without any labels or markers."""
+        
         completion = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "system", "content": prompt}]
@@ -97,7 +95,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         return completion.choices[0].message.content.strip()
     except Exception as e:
         st.error(f"GPT API 호출 중 오류 발생: {str(e)}")
-        return "죄송합니다. 응답을 생성하는 데 문제가 발생했습니다."
+        raise
 
 # 대화 저장 함수
 def save_conversation(session_id, conversation):
@@ -107,6 +105,7 @@ def save_conversation(session_id, conversation):
         index.upsert(vectors=[(session_id, vector, {"conversation": conversation})])
     except Exception as e:
         st.error(f"대화 저장 실패: {str(e)}")
+        raise
 
 # CSS for chat layout
 def get_chat_css():
@@ -153,6 +152,7 @@ def main():
                 st.session_state.conversation.append(first_question)
         except Exception as e:
             st.error(f"첫 질문 생성 중 오류 발생: {str(e)}")
+            raise
 
     # 대화 기록 표시
     st.markdown(get_chat_css(), unsafe_allow_html=True)
@@ -192,6 +192,7 @@ def main():
                 save_conversation(st.session_state.session_id, st.session_state.conversation)
             except Exception as e:
                 st.error(f"응답 생성 중 오류 발생: {str(e)}")
+                raise
             
             st.session_state.user_input = ""  # 입력 필드 초기화
 
