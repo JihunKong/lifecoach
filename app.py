@@ -75,7 +75,7 @@ def summarize_conversation(conversation):
             ],
             max_tokens=100
         )
-        summary = response.choices[0].message.content.strip()  # 최신 접근 방식으로 수정
+        summary = response.choices[0].message.content.strip() 
         return summary
     except Exception as e:
         st.error(f"대화 요약 중 오류 발생: {str(e)}")
@@ -111,7 +111,7 @@ def generate_coach_response(conversation, current_stage, question_count):
             model="gpt-4",
             messages=[{"role": "system", "content": prompt}]
         )
-        return completion.choices[0].message.content.strip()  # 최신 접근 방식으로 수정
+        return completion.choices[0].message.content.strip() 
     except Exception as e:
         st.error(f"GPT API 호출 중 오류 발생: {str(e)}")
         raise
@@ -243,14 +243,13 @@ def main():
                 st.error(f"응답 생성 중 오류 발생: {str(e)}")
                 raise
 
-            # 새로운 질문을 자동으로 갱신
-            st.experimental_rerun()
+            # 인터페이스 갱신
+            st.experimental_update()
 
     if reset_button.button("대화 초기화"):
         st.session_state.conversation = []
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
-        st.experimental_rerun()
 
     # 이전 대화 기록 표시
     st.subheader("이전 대화 기록:")
