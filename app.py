@@ -197,8 +197,18 @@ def process_user_input():
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
 
-        # 입력 필드를 초기화
+        # 입력 필드를 초기화하고 UI 갱신을 유도
         st.session_state.user_input = ""
+        st.session_state.submit_pressed = True
+
+# 첫 질문 생성 함수
+def generate_first_question():
+    try:
+        first_question = generate_coach_response([], st.session_state.current_stage, 0)
+        st.session_state.conversation.append(first_question)
+        st.session_state.submit_pressed = True  # UI 갱신 유도
+    except Exception as e:
+        st.error(f"첫 질문 생성 중 오류 발생: {str(e)}")
 
 # 메인 앱 로직
 def main():
@@ -210,9 +220,14 @@ def main():
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
         st.session_state.conversation = []
+        st.session_state.submit_pressed = False
 
     # CSS 적용
     st.markdown(get_chat_css(), unsafe_allow_html=True)
+
+    # 대화가 없는 경우 첫 질문 생성
+    if not st.session_state.conversation:
+        generate_first_question()
 
     # 현재 질문 표시
     st.subheader("현재 질문:")
@@ -231,6 +246,12 @@ def main():
         st.session_state.conversation = []
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
+        st.session_state.submit_pressed = True
+
+    # UI 갱신: submit_pressed 상태에 따라 리로드
+    if st.session_state.submit_pressed:
+        st.session_state.submit_pressed = False
+        st.experimental_rerun()
 
     # 이전 대화 기록 표시
     st.subheader("이전 대화 기록:")
