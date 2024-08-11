@@ -185,7 +185,7 @@ def main():
 
     # 사용자 입력 및 버튼
     st.subheader("답변 입력:")
-    user_input = st.text_input("메시지를 입력하세요...", value="", key="user_input", max_chars=200)
+    user_input = st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200)
 
     submit_button, _, reset_button = st.columns([1, 1, 1])
 
@@ -193,7 +193,7 @@ def main():
         if user_input:
             # 사용자 입력을 상태에 저장
             st.session_state.conversation.append(user_input)
-
+            
             try:
                 with st.spinner("코치가 응답을 생성하고 있습니다..."):
                     coach_response = generate_coach_response(
