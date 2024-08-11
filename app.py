@@ -49,8 +49,8 @@ def create_vector(text):
     vector = model.encode(text).tolist()
     index_dimension = 1536  # Pinecone 인덱스의 차원
     if len(vector) < index_dimension:
-        vector = vector * (index_dimension // len(vector) + 1)  # 벡터를 반복하여 차원을 맞춤
-    return vector[:index_dimension]  # 정확히 index_dimension 길이로 자름
+        vector = vector * (index_dimension // len(vector) + 1)
+    return vector[:index_dimension]
 
 # 코칭 데이터 로드
 @st.cache_data
@@ -75,7 +75,7 @@ def summarize_conversation(conversation):
             ],
             max_tokens=100
         )
-        summary = response.choices[0].message.content.strip() 
+        summary = response.choices[0].message.content.strip()
         return summary
     except Exception as e:
         st.error(f"대화 요약 중 오류 발생: {str(e)}")
@@ -183,7 +183,6 @@ def process_user_input():
                 )
                 st.session_state.conversation.append(coach_response)
 
-            # 대화 저장 및 단계 전환 처리
             st.session_state.question_count += 1
             if st.session_state.question_count >= 3:
                 stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
@@ -197,16 +196,17 @@ def process_user_input():
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
 
-        # 입력 필드를 초기화하고 UI 갱신을 유도
         st.session_state.user_input = ""
         st.session_state.submit_pressed = True
+        st.rerun()
 
 # 첫 질문 생성 함수
 def generate_first_question():
     try:
         first_question = generate_coach_response([], st.session_state.current_stage, 0)
         st.session_state.conversation.append(first_question)
-        st.session_state.submit_pressed = True  # UI 갱신 유도
+        st.session_state.submit_pressed = True
+        st.rerun()
     except Exception as e:
         st.error(f"첫 질문 생성 중 오류 발생: {str(e)}")
 
@@ -214,7 +214,6 @@ def generate_first_question():
 def main():
     st.title("AI 코칭 시스템")
 
-    # 세션 상태 초기화
     if 'session_id' not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
         st.session_state.current_stage = 'Trust'
@@ -222,19 +221,15 @@ def main():
         st.session_state.conversation = []
         st.session_state.submit_pressed = False
 
-    # CSS 적용
     st.markdown(get_chat_css(), unsafe_allow_html=True)
 
-    # 대화가 없는 경우 첫 질문 생성
     if not st.session_state.conversation:
         generate_first_question()
 
-    # 현재 질문 표시
     st.subheader("현재 질문:")
     current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
     st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
 
-    # 사용자 입력 처리 폼
     with st.form(key='my_form'):
         user_input = st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200)
         submit_button = st.form_submit_button(label='전송')
@@ -247,22 +242,16 @@ def main():
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
         st.session_state.submit_pressed = True
+        st.rerun()
 
-    # UI 갱신: submit_pressed 상태에 따라 리로드
-    if st.session_state.submit_pressed:
-        st.session_state.submit_pressed = False
-        st.experimental_rerun()
-
-    # 이전 대화 기록 표시
     st.subheader("이전 대화 기록:")
     chat_container = st.container()
     with chat_container:
-        for i, message in enumerate(st.session_state.conversation[:-1]):  # 마지막 대화는 현재 질문으로 표시됨
+        for i, message in enumerate(st.session_state.conversation[:-1]):
             if i % 2 == 0:
                 st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
 
-# 메인 앱 실행
 if __name__ == "__main__":
     main()
