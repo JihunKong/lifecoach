@@ -111,29 +111,32 @@ def main():
     # 사용자 입력
     user_input = st.text_input("메시지를 입력하세요...", key="user_input")
 
-    # 엔터 키 감지 및 메시지 제출
-    if user_input:
-        st.session_state.conversation.append(user_input)
-        
-        # 코치 응답 생성
-        coach_response = generate_coach_response(st.session_state.conversation, st.session_state.current_stage, st.session_state.question_count)
-        st.session_state.conversation.append(coach_response)
-        
-        # 질문 카운트 증가 및 단계 관리
-        st.session_state.question_count += 1
-        if st.session_state.question_count >= 3:
-            stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
-            current_stage_index = stages.index(st.session_state.current_stage)
-            if current_stage_index < len(stages) - 1:
-                st.session_state.current_stage = stages[current_stage_index + 1]
-                st.session_state.question_count = 0
-        
-        # 세션 데이터 저장
-        save_session_data(st.session_state.session_id, st.session_state.current_stage, st.session_state.question_count, st.session_state.conversation)
-        
-        # 입력 필드 초기화 및 페이지 새로고침
-        st.session_state.user_input = ""
-        st.experimental_rerun()
+    # 메시지 제출 버튼
+    if st.button("전송"):
+        if user_input:
+            st.session_state.conversation.append(user_input)
+            
+            # 코치 응답 생성
+            coach_response = generate_coach_response(st.session_state.conversation, st.session_state.current_stage, st.session_state.question_count)
+            st.session_state.conversation.append(coach_response)
+            
+            # 질문 카운트 증가 및 단계 관리
+            st.session_state.question_count += 1
+            if st.session_state.question_count >= 3:
+                stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
+                current_stage_index = stages.index(st.session_state.current_stage)
+                if current_stage_index < len(stages) - 1:
+                    st.session_state.current_stage = stages[current_stage_index + 1]
+                    st.session_state.question_count = 0
+            
+            # 세션 데이터 저장
+            save_session_data(st.session_state.session_id, st.session_state.current_stage, st.session_state.question_count, st.session_state.conversation)
+            
+            # 입력 필드 초기화
+            st.session_state.user_input = ""
+            
+            # 페이지 새로고침
+            st.experimental_rerun()
 
     # 현재 세션 정보 표시 (개발용, 실제 사용 시 숨김 처리 가능)
     st.sidebar.write(f"세션 ID: {st.session_state.session_id}")
