@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import uuid
-from openai import OpenAI
+import openai
 from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
 
@@ -12,7 +12,8 @@ st.set_page_config(page_title="AI 코칭 시스템", layout="wide")
 @st.cache_resource
 def init_openai():
     try:
-        return OpenAI(api_key=st.secrets["openai"]["api_key"])
+        openai.api_key = st.secrets["openai"]["api_key"]
+        return openai
     except Exception as e:
         st.error(f"OpenAI 클라이언트 초기화 실패: {str(e)}")
         raise
@@ -66,12 +67,15 @@ coach_df = load_coach_data()
 def summarize_conversation(conversation):
     summary_prompt = f"다음 대화를 요약하세요:\n\n{conversation}"
     try:
-        response = client.Completion.create(
+        response = client.ChatCompletion.create(
             model="gpt-4",
-            prompt=summary_prompt,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": summary_prompt}
+            ],
             max_tokens=100
         )
-        summary = response.choices[0].text.strip()
+        summary = response.choices[0].message['content'].strip()
         return summary
     except Exception as e:
         st.error(f"대화 요약 중 오류 발생: {str(e)}")
@@ -103,11 +107,11 @@ def generate_coach_response(conversation, current_stage, question_count):
         
         Your response should be in Korean and should flow naturally without any labels or markers."""
         
-        completion = client.chat.completions.create(
+        completion = client.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "system", "content": prompt}]
         )
-        return completion.choices[0].message.content.strip()
+        return completion.choices[0].message['content'].strip()
     except Exception as e:
         st.error(f"GPT API 호출 중 오류 발생: {str(e)}")
         raise
