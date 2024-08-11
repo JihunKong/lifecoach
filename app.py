@@ -144,6 +144,9 @@ def get_chat_css():
         font-size: 1.2em;
         font-weight: bold;
     }
+    .input-container {
+        margin-top: 20px;
+    }
     </style>
     """
 
@@ -172,12 +175,55 @@ def main():
             st.error(f"첫 질문 생성 중 오류 발생: {str(e)}")
             raise
 
-    # 대화 기록 표시
+    # CSS 적용
     st.markdown(get_chat_css(), unsafe_allow_html=True)
+
+    # 현재 질문 표시
     st.subheader("현재 질문:")
     current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
     st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
 
+    # 사용자 입력 및 버튼
+    st.subheader("답변 입력:")
+    user_input = st.text_input("메시지를 입력하세요...", value="", key="user_input", max_chars=200)
+    submit_button, reset_button = st.columns([1, 1])
+
+    with submit_button:
+        if st.button("전송"):
+            if user_input:
+                # 사용자 입력을 상태에 저장 후 입력 필드 초기화
+                st.session_state.conversation.append(user_input)
+                st.session_state.user_input = ""  # 입력 필드 초기화
+                
+                try:
+                    with st.spinner("코치가 응답을 생성하고 있습니다..."):
+                        coach_response = generate_coach_response(
+                            st.session_state.conversation,
+                            st.session_state.current_stage,
+                            st.session_state.question_count
+                        )
+                        st.session_state.conversation.append(coach_response)
+                    
+                    st.session_state.question_count += 1
+                    if st.session_state.question_count >= 3:
+                        stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
+                        current_stage_index = stages.index(st.session_state.current_stage)
+                        if current_stage_index < len(stages) - 1:
+                            st.session_state.current_stage = stages[current_stage_index + 1]
+                            st.session_state.question_count = 0
+                    
+                    save_conversation(st.session_state.session_id, st.session_state.conversation)
+                except Exception as e:
+                    st.error(f"응답 생성 중 오류 발생: {str(e)}")
+                    raise
+
+    with reset_button:
+        if st.button("대화 초기화"):
+            st.session_state.conversation = []
+            st.session_state.current_stage = 'Trust'
+            st.session_state.question_count = 0
+
+    # 이전 대화 기록 표시
     st.subheader("이전 대화 기록:")
     chat_container = st.container()
     with chat_container:
@@ -186,43 +232,6 @@ def main():
                 st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
-
-    # 사용자 입력 관리
-    user_input = st.text_input("메시지를 입력하세요...", value="")
-
-    # 메시지 제출 버튼
-    if st.button("전송"):
-        if user_input:
-            # 사용자 입력을 상태에 저장 후 입력 필드 초기화
-            st.session_state.conversation.append(user_input)
-            
-            try:
-                with st.spinner("코치가 응답을 생성하고 있습니다..."):
-                    coach_response = generate_coach_response(
-                        st.session_state.conversation,
-                        st.session_state.current_stage,
-                        st.session_state.question_count
-                    )
-                    st.session_state.conversation.append(coach_response)
-                
-                st.session_state.question_count += 1
-                if st.session_state.question_count >= 3:
-                    stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
-                    current_stage_index = stages.index(st.session_state.current_stage)
-                    if current_stage_index < len(stages) - 1:
-                        st.session_state.current_stage = stages[current_stage_index + 1]
-                        st.session_state.question_count = 0
-                
-                save_conversation(st.session_state.session_id, st.session_state.conversation)
-            except Exception as e:
-                st.error(f"응답 생성 중 오류 발생: {str(e)}")
-                raise
-
-    # 대화 초기화 버튼
-    if st.button("대화 초기화"):
-        st.session_state.conversation = []
-        st.session_state.current_stage = 'Trust'
-        st.session_state.question_count = 0
 
 # 메인 앱 실행
 if __name__ == "__main__":
