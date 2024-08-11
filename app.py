@@ -78,16 +78,23 @@ def generate_coach_response(conversation, current_stage, question_count):
         st.error(f"GPT API 호출 중 오류 발생: {str(e)}")
         return "죄송합니다. 응답을 생성하는 데 문제가 발생했습니다."
 
+# 세션 상태 초기화 함수
+def initialize_session_state():
+    if 'session_id' not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+    if 'current_stage' not in st.session_state:
+        st.session_state.current_stage = 'Trust'
+    if 'question_count' not in st.session_state:
+        st.session_state.question_count = 0
+    if 'conversation' not in st.session_state:
+        st.session_state.conversation = []
+
 # 메인 앱 로직
 def main():
     st.title("GPT 기반 TEACHer 코칭 시스템")
 
-    # 세션 관리
-    if 'session_id' not in st.session_state:
-        st.session_state.session_id = str(uuid.uuid4())
-        st.session_state.current_stage = 'Trust'
-        st.session_state.question_count = 0
-        st.session_state.conversation = []
+    # 세션 상태 초기화
+    initialize_session_state()
     
     # 첫 질문 생성
     if not st.session_state.conversation:
