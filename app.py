@@ -90,7 +90,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         Your response should be in Korean and should flow naturally without any labels or markers."""
         
         completion = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip() 
@@ -172,6 +172,7 @@ def process_user_input(user_input):
                     st.session_state.question_count = 0
 
             save_conversation(st.session_state.session_id, st.session_state.conversation)
+            st.experimental_rerun()  # 이곳에 st.experimental_rerun()을 추가
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
 
@@ -208,13 +209,9 @@ def main():
     st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
 
     # Use st.form for user input
-    with st.form(key='chat_form'):
-        user_input = st.text_input("메시지를 입력하세요...", key="user_input_field", max_chars=200)
-        submit_button = st.form_submit_button(label='전송')
-
-    if submit_button and user_input:
+    user_input = st.text_input("메시지를 입력하세요...", key="user_input_field", max_chars=200)
+    if st.button("전송") and user_input:
         process_user_input(user_input)
-        st.rerun()
 
     if st.button("대화 초기화"):
         st.session_state.conversation = []
