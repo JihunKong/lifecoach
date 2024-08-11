@@ -5,11 +5,6 @@ from openai import OpenAI
 from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
 
-# 디버깅 함수 (개발자 모드에서만 표시)
-def debug_print(message):
-    if st.session_state.get('dev_mode', False):
-        st.sidebar.write(f"Debug: {message}")
-
 # Streamlit 페이지 설정
 st.set_page_config(page_title="AI 코칭 시스템", layout="wide")
 
@@ -77,7 +72,6 @@ def generate_coach_response(conversation, current_stage, question_count):
         results = index.query(vector=query_vector, top_k=3, include_metadata=True)
         similar_conversations = [item['metadata']['conversation'] for item in results['matches']]
     except Exception as e:
-        debug_print(f"유사한 대화 검색 실패: {str(e)}")
         similar_conversations = []
     
     prompt = f"""You are an empathetic life coach using the TEACHer model. 
@@ -86,14 +80,12 @@ def generate_coach_response(conversation, current_stage, question_count):
     Previous conversation: {conversation[-5:] if len(conversation) > 5 else conversation}
     Similar past conversations: {similar_conversations}
     
-    Based on the user's responses and similar past conversations, generate a natural, empathetic response and a follow-up question.
+    Based on the user's responses and similar past conversations, generate a natural, empathetic response.
+    Then, ask a single follow-up question related to the current stage.
     Choose from or create a question similar to these for the current stage:
     {available_questions}
     
-    Your response should be in Korean and follow this format:
-    [Empathetic response]
-    
-    [Follow-up question]"""
+    Your response should be in Korean and should flow naturally without any labels or markers."""
     
     try:
         completion = client.chat.completions.create(
@@ -115,8 +107,6 @@ def initialize_session_state():
         st.session_state.question_count = 0
     if 'conversation' not in st.session_state:
         st.session_state.conversation = []
-    if 'dev_mode' not in st.session_state:
-        st.session_state.dev_mode = False
     if 'user_input' not in st.session_state:
         st.session_state.user_input = ""
 
@@ -127,11 +117,7 @@ def save_conversation(session_id, conversation):
     try:
         index.upsert(vectors=[(session_id, vector, {"conversation": conversation})])
     except Exception as e:
-        debug_print(f"대화 저장 실패: {str(e)}")
-
-# 입력 필드를 비우는 콜백 함수
-def clear_input():
-    st.session_state.user_input = ""
+        st.error(f"대화 저장 실패: {str(e)}")
 
 # 메인 앱 로직
 def main():
@@ -139,10 +125,6 @@ def main():
 
     # 세션 상태 초기화
     initialize_session_state()
-    
-    # 사이드바에 개발자 모드 토글 추가
-    st.sidebar.title("설정")
-    st.session_state.dev_mode = st.sidebar.checkbox("개발자 모드", value=st.session_state.dev_mode)
     
     # 첫 질문 생성
     if not st.session_state.conversation:
@@ -161,48 +143,49 @@ def main():
                 st.success(f"나: {message}")
 
     # 사용자 입력
-    user_input = st.text_input("메시지를 입력하세요...", key="user_input", on_change=clear_input)
+    user_input = st.text_input("메시지를 입력하세요...", key="user_input")
 
+    # 버튼 컨테이너 생성
+    col1, col2 = st.columns(2)
+    
     # 메시지 제출 버튼
-    if st.button("전송", key="send_button") or user_input:  # 버튼 클릭 또는 Enter 키 입력 시
-        if st.session_state.user_input:  # session_state에서 입력값 확인
-            user_message = st.session_state.user_input
-            st.session_state.conversation.append(user_message)
-            
-            with st.spinner("코치가 응답을 생성하고 있습니다..."):
-                # 코치 응답 생성
-                coach_response = generate_coach_response(st.session_state.conversation, st.session_state.current_stage, st.session_state.question_count)
-                st.session_state.conversation.append(coach_response)
-            
-            # 질문 카운트 증가 및 단계 관리
-            st.session_state.question_count += 1
-            if st.session_state.question_count >= 3:
-                stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
-                current_stage_index = stages.index(st.session_state.current_stage)
-                if current_stage_index < len(stages) - 1:
-                    st.session_state.current_stage = stages[current_stage_index + 1]
-                    st.session_state.question_count = 0
-            
-            # 대화 저장
-            save_conversation(st.session_state.session_id, st.session_state.conversation)
-            
-            # 입력 필드 초기화 및 페이지 새로고침
+    with col1:
+        if st.button("전송", key="send_button", use_container_width=True):
+            process_user_input(user_input)
+
+    # 대화 초기화 버튼
+    with col2:
+        if st.button("대화 초기화", key="reset_button", use_container_width=True):
+            st.session_state.conversation = []
+            st.session_state.current_stage = 'Trust'
+            st.session_state.question_count = 0
             st.session_state.user_input = ""
             st.rerun()
 
-    # 대화 초기화 버튼
-    if st.button("대화 초기화"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        initialize_session_state()
+def process_user_input(user_input):
+    if user_input:
+        st.session_state.conversation.append(user_input)
+        
+        with st.spinner("코치가 응답을 생성하고 있습니다..."):
+            # 코치 응답 생성
+            coach_response = generate_coach_response(st.session_state.conversation, st.session_state.current_stage, st.session_state.question_count)
+            st.session_state.conversation.append(coach_response)
+        
+        # 질문 카운트 증가 및 단계 관리
+        st.session_state.question_count += 1
+        if st.session_state.question_count >= 3:
+            stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
+            current_stage_index = stages.index(st.session_state.current_stage)
+            if current_stage_index < len(stages) - 1:
+                st.session_state.current_stage = stages[current_stage_index + 1]
+                st.session_state.question_count = 0
+        
+        # 대화 저장
+        save_conversation(st.session_state.session_id, st.session_state.conversation)
+        
+        # 입력 필드 초기화 및 페이지 새로고침
+        st.session_state.user_input = ""
         st.rerun()
-
-    # 개발자 모드에서만 세션 정보 표시
-    if st.session_state.dev_mode:
-        st.sidebar.subheader("세션 정보")
-        st.sidebar.write(f"세션 ID: {st.session_state.session_id}")
-        st.sidebar.write(f"현재 단계: {st.session_state.current_stage}")
-        st.sidebar.write(f"질문 수: {st.session_state.question_count}")
 
 # 코칭 데이터 로드
 coach_df = load_coach_data()
