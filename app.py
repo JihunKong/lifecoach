@@ -62,7 +62,93 @@ def create_vector(text):
 
 debug_print(f"벡터 차원 조정 함수 생성 완료. 조정 후 차원: {len(create_vector('Test'))}")
 
-# 나머지 코드는 이전과 동일...
+# 코칭 데이터 로드
+@st.cache_data
+def load_coach_data():
+    try:
+        data = pd.read_excel('coach.xlsx')
+        debug_print("코칭 데이터 로드 성공")
+        return data
+    except Exception as e:
+        debug_print(f"코칭 데이터 로드 실패: {str(e)}")
+        return pd.DataFrame()
+
+# GPT를 사용한 코칭 대화 생성 함수
+def generate_coach_response(conversation, current_stage, question_count):
+    debug_print(f"대화 생성 시작: 단계 {current_stage}, 질문 수 {question_count}")
+    stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
+    available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
+    available_questions = [q for q in available_questions if pd.notnull(q)]
+    
+    recent_conversation = " ".join(conversation[-5:])
+    query_vector = create_vector(recent_conversation)
+    try:
+        results = index.query(vector=query_vector, top_k=3, include_metadata=True)
+        similar_conversations = [item['metadata']['conversation'] for item in results['matches']]
+        debug_print("유사한 대화 검색 성공")
+    except Exception as e:
+        debug_print(f"유사한 대화 검색 실패: {str(e)}")
+        similar_conversations = []
+    
+    prompt = f"""You are an empathetic life coach using the TEACHer model. 
+    Current stage: {current_stage}
+    Question count: {question_count}
+    Previous conversation: {conversation[-5:] if len(conversation) > 5 else conversation}
+    Similar past conversations: {similar_conversations}
+    
+    Based on the user's responses and similar past conversations, generate a natural, empathetic response and a follow-up question.
+    Choose from or create a question similar to these for the current stage:
+    {available_questions}
+    
+    Your response should be in Korean and follow this format:
+    [Empathetic response]
+    
+    [Follow-up question]"""
+    
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "system", "content": prompt}]
+        )
+        response = completion.choices[0].message.content.strip()
+        debug_print("GPT 응답 생성 성공")
+        return response
+    except Exception as e:
+        debug_print(f"GPT API 호출 중 오류 발생: {str(e)}")
+        return "죄송합니다. 응답을 생성하는 데 문제가 발생했습니다."
+
+# 세션 상태 초기화 함수
+def initialize_session_state():
+    if 'session_id' not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+    if 'current_stage' not in st.session_state:
+        st.session_state.current_stage = 'Trust'
+    if 'question_count' not in st.session_state:
+        st.session_state.question_count = 0
+    if 'conversation' not in st.session_state:
+        st.session_state.conversation = []
+    if 'user_input' not in st.session_state:
+        st.session_state.user_input = ""
+    debug_print("세션 상태 초기화 완료")
+
+# 대화 초기화 함수
+def reset_conversation():
+    st.session_state.session_id = str(uuid.uuid4())
+    st.session_state.current_stage = 'Trust'
+    st.session_state.question_count = 0
+    st.session_state.conversation = []
+    st.session_state.user_input = ""
+    debug_print("대화 초기화 완료")
+
+# 대화 저장 함수
+def save_conversation(session_id, conversation):
+    conversation_text = " ".join(conversation)
+    vector = create_vector(conversation_text)
+    try:
+        index.upsert(vectors=[(session_id, vector, {"conversation": conversation})])
+        debug_print("대화 저장 성공")
+    except Exception as e:
+        debug_print(f"대화 저장 실패: {str(e)}")
 
 # 메인 앱 로직
 def main():
