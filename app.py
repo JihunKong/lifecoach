@@ -90,7 +90,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         Your response should be in Korean and should flow naturally without any labels or markers."""
         
         completion = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip() 
@@ -172,7 +172,8 @@ def process_user_input(user_input):
                     st.session_state.question_count = 0
 
             save_conversation(st.session_state.session_id, st.session_state.conversation)
-            st.rerun() 
+            st.session_state.user_input = ""  # 입력창 비우기
+            st.experimental_rerun()  # 대화창 업데이트
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
 
@@ -181,7 +182,7 @@ def generate_first_question():
     try:
         first_question = generate_coach_response([], st.session_state.current_stage, 0)
         st.session_state.conversation.append(first_question)
-        st.rerun()
+        st.experimental_rerun()
     except Exception as e:
         st.error(f"첫 질문 생성 중 오류 발생: {str(e)}")
 
@@ -198,6 +199,8 @@ def main():
         st.session_state.question_count = 0
     if 'conversation' not in st.session_state:
         st.session_state.conversation = []
+    if 'user_input' not in st.session_state:
+        st.session_state.user_input = ""  # 입력창 상태 초기화
 
     st.markdown(get_chat_css(), unsafe_allow_html=True)
 
@@ -208,8 +211,7 @@ def main():
     current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
     st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
 
-    # Use st.form for user input
-    user_input = st.text_input("메시지를 입력하세요...", key="user_input_field", max_chars=200)
+    user_input = st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, value=st.session_state.user_input)
     if st.button("전송") and user_input:
         process_user_input(user_input)
 
@@ -217,7 +219,7 @@ def main():
         st.session_state.conversation = []
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
-        st.rerun()
+        st.experimental_rerun()
 
     st.subheader("이전 대화 기록:")
     chat_container = st.container()
