@@ -186,14 +186,14 @@ def main():
     # 사용자 입력 및 버튼
     st.subheader("답변 입력:")
     user_input = st.text_input("메시지를 입력하세요...", value="", key="user_input", max_chars=200)
-    submit_button, reset_button = st.columns([1, 1])
+
+    submit_button, _, reset_button = st.columns([1, 1, 1])
 
     with submit_button:
         if st.button("전송"):
             if user_input:
                 # 사용자 입력을 상태에 저장 후 입력 필드 초기화
                 st.session_state.conversation.append(user_input)
-                st.session_state.user_input = ""  # 입력 필드 초기화
                 
                 try:
                     with st.spinner("코치가 응답을 생성하고 있습니다..."):
