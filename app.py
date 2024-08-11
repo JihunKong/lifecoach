@@ -117,6 +117,8 @@ def initialize_session_state():
         st.session_state.conversation = []
     if 'dev_mode' not in st.session_state:
         st.session_state.dev_mode = False
+    if 'user_input' not in st.session_state:
+        st.session_state.user_input = ""
 
 # 대화 저장 함수
 def save_conversation(session_id, conversation):
@@ -126,6 +128,10 @@ def save_conversation(session_id, conversation):
         index.upsert(vectors=[(session_id, vector, {"conversation": conversation})])
     except Exception as e:
         debug_print(f"대화 저장 실패: {str(e)}")
+
+# 입력 필드를 비우는 콜백 함수
+def clear_input():
+    st.session_state.user_input = ""
 
 # 메인 앱 로직
 def main():
@@ -155,7 +161,7 @@ def main():
                 st.success(f"나: {message}")
 
     # 사용자 입력
-    user_input = st.text_input("메시지를 입력하세요...", key="user_input")
+    user_input = st.text_input("메시지를 입력하세요...", key="user_input", on_change=clear_input)
 
     # 메시지 제출 버튼
     if st.button("전송", key="send_button"):
@@ -180,6 +186,7 @@ def main():
             save_conversation(st.session_state.session_id, st.session_state.conversation)
             
             # 입력 필드 초기화 및 페이지 새로고침
+            st.session_state.user_input = ""
             st.rerun()
 
     # 대화 초기화 버튼
