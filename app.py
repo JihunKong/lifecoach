@@ -217,7 +217,7 @@ def main():
         st.session_state.conversation = []
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
-        st.experimental_rerun()
+        st.rerun()
 
     st.subheader("이전 대화 기록:")
     chat_container = st.container()
