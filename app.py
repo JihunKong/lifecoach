@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import uuid
 from openai import OpenAI
-from pinecone import Pinecone, ServerlessSpec
+from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
 
 # 디버깅 함수
@@ -30,34 +30,35 @@ except Exception as e:
 
 index_name = "coach"
 
-# 벡터 인덱스가 존재하지 않으면 생성
-try:
-    if index_name not in pc.list_indexes():
-        pc.create_index(
-            name=index_name,
-            dimension=1536,
-            metric="cosine",
-            spec=ServerlessSpec(cloud="aws", region="us-east-1")
-        )
-        debug_print("Pinecone 인덱스 생성 성공")
-    else:
-        debug_print("Pinecone 인덱스 이미 존재함")
-except Exception as e:
-    debug_print(f"Pinecone 인덱스 생성 실패: {str(e)}")
-
-# 벡터 인덱스 연결
-try:
-    index = pc.Index(index_name)
-    debug_print("Pinecone 인덱스 연결 성공")
-except Exception as e:
-    debug_print(f"Pinecone 인덱스 연결 실패: {str(e)}")
-
 # Sentence Transformer 모델 로드
 try:
     model = SentenceTransformer('all-mpnet-base-v2')
-    debug_print("Sentence Transformer 모델 로드 성공")
+    test_vector = model.encode("Test sentence")
+    vector_dimension = len(test_vector)
+    debug_print(f"Sentence Transformer 모델 로드 성공. 벡터 차원: {vector_dimension}")
 except Exception as e:
     debug_print(f"Sentence Transformer 모델 로드 실패: {str(e)}")
+
+# Pinecone 인덱스 연결
+try:
+    index = pc.Index(index_name)
+    index_stats = index.describe_index_stats()
+    index_dimension = index_stats['dimension']
+    debug_print(f"Pinecone 인덱스 연결 성공. 인덱스 차원: {index_dimension}")
+    
+    if vector_dimension != index_dimension:
+        debug_print(f"경고: 모델 벡터 차원({vector_dimension})과 인덱스 차원({index_dimension})이 일치하지 않습니다.")
+except Exception as e:
+    debug_print(f"Pinecone 인덱스 연결 실패: {str(e)}")
+
+# 벡터 생성 함수 (차원 조정)
+def create_vector(text):
+    vector = model.encode(text).tolist()
+    if len(vector) < index_dimension:
+        vector += [0] * (index_dimension - len(vector))
+    elif len(vector) > index_dimension:
+        vector = vector[:index_dimension]
+    return vector
 
 # 코칭 데이터 로드
 @st.cache_data
@@ -77,9 +78,8 @@ def generate_coach_response(conversation, current_stage, question_count):
     available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
     available_questions = [q for q in available_questions if pd.notnull(q)]
     
-    # 최근 대화 내용을 벡터화하여 유사한 과거 대화 검색
     recent_conversation = " ".join(conversation[-5:])
-    query_vector = model.encode(recent_conversation).tolist()
+    query_vector = create_vector(recent_conversation)
     try:
         results = index.query(vector=query_vector, top_k=3, include_metadata=True)
         similar_conversations = [item['metadata']['conversation'] for item in results['matches']]
@@ -141,7 +141,7 @@ def reset_conversation():
 # 대화 저장 함수
 def save_conversation(session_id, conversation):
     conversation_text = " ".join(conversation)
-    vector = model.encode(conversation_text).tolist()
+    vector = create_vector(conversation_text)
     try:
         index.upsert(vectors=[(session_id, vector, {"conversation": conversation})])
         debug_print("대화 저장 성공")
@@ -164,7 +164,7 @@ def main():
     # 대화 기록 표시
     for i, message in enumerate(st.session_state.conversation):
         if i % 2 == 0:
-            st.text_area("Coach:", value=message, height=100, key=f"msg_{i}", disabled=True)
+            st.text_area("Coach:", value=message, height=200, key=f"msg_{i}", disabled=True)
         else:
             st.text_area("You:", value=message, height=100, key=f"msg_{i}", disabled=True)
 
