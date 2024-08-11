@@ -127,18 +127,7 @@ def initialize_session_state():
         st.session_state.question_count = 0
     if 'conversation' not in st.session_state:
         st.session_state.conversation = []
-    if 'user_input' not in st.session_state:
-        st.session_state.user_input = ""
     debug_print("세션 상태 초기화 완료")
-
-# 대화 초기화 함수
-def reset_conversation():
-    st.session_state.session_id = str(uuid.uuid4())
-    st.session_state.current_stage = 'Trust'
-    st.session_state.question_count = 0
-    st.session_state.conversation = []
-    st.session_state.user_input = ""
-    debug_print("대화 초기화 완료")
 
 # 대화 저장 함수
 def save_conversation(session_id, conversation):
@@ -171,7 +160,7 @@ def main():
             st.text_area("You:", value=message, height=100, key=f"msg_{i}", disabled=True)
 
     # 사용자 입력
-    user_input = st.text_input("메시지를 입력하세요...", key="user_input", value=st.session_state.user_input)
+    user_input = st.text_input("메시지를 입력하세요...", key="user_input")
 
     # 메시지 제출 버튼
     if st.button("전송"):
@@ -197,15 +186,14 @@ def main():
             # 대화 저장
             save_conversation(st.session_state.session_id, st.session_state.conversation)
             
-            # 입력 필드 초기화
-            st.session_state.user_input = ""
-            
             # 페이지 새로고침
             st.experimental_rerun()
 
     # 대화 초기화 버튼
     if st.button("대화 초기화"):
-        reset_conversation()
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        initialize_session_state()
         st.experimental_rerun()
 
     # 현재 세션 정보 표시 (개발용, 실제 사용 시 숨김 처리 가능)
