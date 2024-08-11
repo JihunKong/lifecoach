@@ -168,12 +168,13 @@ def main():
             else:
                 st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
 
-    # 사용자 입력
-    user_input = st.text_input("메시지를 입력하세요...", key="user_input")
+    # 사용자 입력 관리
+    user_input = st.text_input("메시지를 입력하세요...", value="")
 
     # 메시지 제출 버튼
-    if st.button("전송", key="send_button"):
+    if st.button("전송"):
         if user_input:
+            # 사용자 입력을 상태에 저장 후 입력 필드 초기화
             st.session_state.conversation.append(user_input)
             
             try:
@@ -197,16 +198,12 @@ def main():
             except Exception as e:
                 st.error(f"응답 생성 중 오류 발생: {str(e)}")
                 raise
-            
-            # 입력 필드 초기화
-            st.session_state.user_input = ""  # 이 부분에서 오류가 발생하지 않도록 주의
 
     # 대화 초기화 버튼
-    if st.button("대화 초기화", key="reset_button"):
+    if st.button("대화 초기화"):
         st.session_state.conversation = []
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
-        st.session_state.user_input = ""  # 입력 필드 초기화
 
 # 메인 앱 실행
 if __name__ == "__main__":
