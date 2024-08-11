@@ -151,7 +151,8 @@ def get_chat_css():
     """
 
 # 사용자 입력 처리 함수
-def process_user_input(user_input):
+def process_user_input():
+    user_input = st.session_state.user_input
     if user_input:
         st.session_state.conversation.append(user_input)
         try:
@@ -172,10 +173,10 @@ def process_user_input(user_input):
                     st.session_state.question_count = 0
 
             save_conversation(st.session_state.session_id, st.session_state.conversation)
-            st.session_state.user_input = ""  # 입력창 비우기
-            st.experimental_rerun()  # 대화창 업데이트
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
+        finally:
+            st.session_state.user_input = ""  # 입력창 비우기
 
 # 첫 질문 생성 함수
 def generate_first_question():
@@ -200,7 +201,7 @@ def main():
     if 'conversation' not in st.session_state:
         st.session_state.conversation = []
     if 'user_input' not in st.session_state:
-        st.session_state.user_input = ""  # 입력창 상태 초기화
+        st.session_state.user_input = ""
 
     st.markdown(get_chat_css(), unsafe_allow_html=True)
 
@@ -211,9 +212,8 @@ def main():
     current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
     st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
 
-    user_input = st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, value=st.session_state.user_input)
-    if st.button("전송") and user_input:
-        process_user_input(user_input)
+    # 입력 처리와 상태 초기화를 위해 on_change 사용
+    st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
 
     if st.button("대화 초기화"):
         st.session_state.conversation = []
