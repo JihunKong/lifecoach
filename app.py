@@ -144,6 +144,10 @@ def main():
         st.session_state.question_count = 0
         st.session_state.conversation = []
 
+    # 초기화하지 않은 키 확인 및 초기화
+    if 'user_input' not in st.session_state:
+        st.session_state.user_input = ""
+
     # 첫 질문 생성
     if not st.session_state.conversation:
         try:
