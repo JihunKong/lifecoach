@@ -64,14 +64,22 @@ coach_df = load_coach_data()
 
 # 대화 요약 함수
 def summarize_conversation(conversation):
-    if len(conversation) > 5:
-        return conversation[:2] + ["...이전 대화 요약..."] + conversation[-2:]
-    return conversation
+    summary_prompt = f"다음 대화를 요약하세요:\n\n{conversation}"
+    try:
+        response = client.Completion.create(
+            model="gpt-4",
+            prompt=summary_prompt,
+            max_tokens=100
+        )
+        summary = response.choices[0].text.strip()
+        return summary
+    except Exception as e:
+        st.error(f"대화 요약 중 오류 발생: {str(e)}")
+        return "요약 실패: 요약을 생성하는 데 문제가 발생했습니다."
 
 # GPT를 사용한 코칭 대화 생성 함수
 def generate_coach_response(conversation, current_stage, question_count):
     try:
-        conversation = summarize_conversation(conversation)
         stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
         available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
         available_questions = [q for q in available_questions if pd.notnull(q)]
@@ -171,6 +179,12 @@ def main():
     # 초기화하지 않은 키 확인 및 초기화
     if 'user_input' not in st.session_state:
         st.session_state.user_input = ""
+
+    # 대화가 10개 이상이면 요약
+    if len(st.session_state.conversation) >= 10:
+        summarized_conversation = summarize_conversation(st.session_state.conversation)
+        st.session_state.conversation = [summarized_conversation]
+        save_conversation(st.session_state.session_id, st.session_state.conversation)
 
     # 첫 질문 생성
     if not st.session_state.conversation:
