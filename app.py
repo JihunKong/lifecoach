@@ -179,8 +179,6 @@ def process_user_input():
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
 
         st.session_state.user_input = ""  # 입력 필드 초기화
-
-        # rerun 호출로 새로고침 처리
         st.rerun()
 
 # 첫 질문 생성 함수
@@ -199,9 +197,15 @@ def main():
 
     if 'session_id' not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
+    if 'current_stage' not in st.session_state:
         st.session_state.current_stage = 'Trust'
+    if 'question_count' not in st.session_state:
         st.session_state.question_count = 0
+    if 'conversation' not in st.session_state:
         st.session_state.conversation = []
+    if 'user_input' not in st.session_state:
+        st.session_state.user_input = ""
+    if 'submit_pressed' not in st.session_state:
         st.session_state.submit_pressed = False
 
     st.markdown(get_chat_css(), unsafe_allow_html=True)
@@ -230,7 +234,7 @@ def main():
     st.subheader("이전 대화 기록:")
     chat_container = st.container()
     with chat_container:
-        for i, message in enumerate(st.session_state.conversation[:-1]):  # 마지막 대화는 현재 질문으로 표시됨
+        for i, message in enumerate(st.session_state.conversation[:-1]):
             if i % 2 == 0:
                 st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
             else:
