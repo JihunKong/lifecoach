@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import uuid
 from openai import OpenAI
-import sqlite3
-import json
+import pinecone
+from sentence_transformers import SentenceTransformer
 
 # Streamlit 페이지 설정
 st.set_page_config(page_title="GPT 기반 TEACHer 코칭 시스템", layout="wide")
@@ -11,37 +11,19 @@ st.set_page_config(page_title="GPT 기반 TEACHer 코칭 시스템", layout="wid
 # OpenAI 클라이언트 초기화
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
-# 데이터베이스 관련 함수들
-def get_db_connection():
-    conn = sqlite3.connect('coaching_sessions.db')
-    conn.row_factory = sqlite3.Row
-    return conn
+# Pinecone 초기화
+pinecone.init(api_key=st.secrets["pinecone"]["api_key"], environment=st.secrets["pinecone"]["environment"])
+index_name = "coaching-conversations"
 
-def init_db():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS sessions
-                 (id TEXT PRIMARY KEY, stage TEXT, question_count INTEGER, conversation TEXT)''')
-    conn.commit()
-    conn.close()
+# 벡터 인덱스가 존재하지 않으면 생성
+if index_name not in pinecone.list_indexes():
+    pinecone.create_index(index_name, dimension=384, metric="cosine")
 
-def save_session_data(session_id, stage, question_count, conversation):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?)",
-              (session_id, stage, question_count, json.dumps(conversation)))
-    conn.commit()
-    conn.close()
+# 벡터 인덱스 연결
+index = pinecone.Index(index_name)
 
-def load_session_data(session_id):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM sessions WHERE id = ?", (session_id,))
-    row = c.fetchone()
-    conn.close()
-    if row:
-        return row['stage'], row['question_count'], json.loads(row['conversation'])
-    return 'Trust', 0, []
+# Sentence Transformer 모델 로드
+model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # 코칭 데이터 로드
 @st.cache_data
@@ -54,12 +36,20 @@ def generate_coach_response(conversation, current_stage, question_count):
     available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
     available_questions = [q for q in available_questions if pd.notnull(q)]
     
+    # 최근 대화 내용을 벡터화하여 유사한 과거 대화 검색
+    recent_conversation = " ".join(conversation[-5:])
+    query_vector = model.encode(recent_conversation).tolist()
+    results = index.query(query_vector, top_k=3, include_metadata=True)
+    
+    similar_conversations = [item['metadata']['conversation'] for item in results['matches']]
+    
     prompt = f"""You are an empathetic life coach using the TEACHer model. 
     Current stage: {current_stage}
     Question count: {question_count}
     Previous conversation: {conversation[-5:] if len(conversation) > 5 else conversation}
+    Similar past conversations: {similar_conversations}
     
-    Based on the user's responses, generate a natural, empathetic response and a follow-up question.
+    Based on the user's responses and similar past conversations, generate a natural, empathetic response and a follow-up question.
     Choose from or create a question similar to these for the current stage:
     {available_questions}
     
@@ -98,6 +88,12 @@ def reset_conversation():
     st.session_state.question_count = 0
     st.session_state.conversation = []
     st.session_state.user_input = ""
+
+# 대화 저장 함수
+def save_conversation(session_id, conversation):
+    conversation_text = " ".join(conversation)
+    vector = model.encode(conversation_text).tolist()
+    index.upsert([(session_id, vector, {"conversation": conversation})])
 
 # 메인 앱 로직
 def main():
@@ -139,8 +135,8 @@ def main():
                     st.session_state.current_stage = stages[current_stage_index + 1]
                     st.session_state.question_count = 0
             
-            # 세션 데이터 저장
-            save_session_data(st.session_state.session_id, st.session_state.current_stage, st.session_state.question_count, st.session_state.conversation)
+            # 대화 저장
+            save_conversation(st.session_state.session_id, st.session_state.conversation)
             
             # 입력 필드 초기화
             st.session_state.user_input = ""
@@ -158,8 +154,7 @@ def main():
     st.sidebar.write(f"현재 단계: {st.session_state.current_stage}")
     st.sidebar.write(f"질문 수: {st.session_state.question_count}")
 
-# 데이터베이스 초기화 및 코칭 데이터 로드
-init_db()
+# 코칭 데이터 로드
 coach_df = load_coach_data()
 
 # 메인 앱 실행
