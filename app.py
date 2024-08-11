@@ -67,7 +67,7 @@ coach_df = load_coach_data()
 def summarize_conversation(conversation):
     summary_prompt = f"다음 대화를 요약하세요:\n\n{conversation}"
     try:
-        response = client.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
@@ -107,7 +107,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         
         Your response should be in Korean and should flow naturally without any labels or markers."""
         
-        completion = client.ChatCompletion.create(
+        completion = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "system", "content": prompt}]
         )
