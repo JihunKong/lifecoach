@@ -75,7 +75,7 @@ def summarize_conversation(conversation):
             ],
             max_tokens=100
         )
-        summary = response.choices[0].message['content'].strip()
+        summary = response.choices[0].message.content.strip()  # 최신 접근 방식으로 수정
         return summary
     except Exception as e:
         st.error(f"대화 요약 중 오류 발생: {str(e)}")
@@ -111,7 +111,7 @@ def generate_coach_response(conversation, current_stage, question_count):
             model="gpt-4",
             messages=[{"role": "system", "content": prompt}]
         )
-        return completion.choices[0].message['content'].strip()
+        return completion.choices[0].message.content.strip()  # 최신 접근 방식으로 수정
     except Exception as e:
         st.error(f"GPT API 호출 중 오류 발생: {str(e)}")
         raise
