@@ -150,12 +150,10 @@ def get_chat_css():
     </style>
     """
 
-# 사용자 입력 처리 콜백 함수
-def process_user_input():
-    if 'user_input' in st.session_state and st.session_state.user_input:
-        user_input = st.session_state.user_input
+# 사용자 입력 처리 함수
+def process_user_input(user_input):
+    if user_input:
         st.session_state.conversation.append(user_input)
-
         try:
             with st.spinner("코치가 응답을 생성하고 있습니다..."):
                 coach_response = generate_coach_response(
@@ -174,22 +172,14 @@ def process_user_input():
                     st.session_state.question_count = 0
 
             save_conversation(st.session_state.session_id, st.session_state.conversation)
-
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
-
-        # Reset user input after processing
-        if 'user_input' in st.session_state:
-            del st.session_state.user_input
-
-        st.experimental_rerun()
 
 # 첫 질문 생성 함수
 def generate_first_question():
     try:
         first_question = generate_coach_response([], st.session_state.current_stage, 0)
         st.session_state.conversation.append(first_question)
-        st.session_state.submit_pressed = True
         st.experimental_rerun()
     except Exception as e:
         st.error(f"첫 질문 생성 중 오류 발생: {str(e)}")
@@ -207,8 +197,6 @@ def main():
         st.session_state.question_count = 0
     if 'conversation' not in st.session_state:
         st.session_state.conversation = []
-    if 'submit_pressed' not in st.session_state:
-        st.session_state.submit_pressed = False
 
     st.markdown(get_chat_css(), unsafe_allow_html=True)
 
@@ -221,18 +209,17 @@ def main():
 
     # Use st.form for user input
     with st.form(key='chat_form'):
-        user_input = st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200)
+        user_input = st.text_input("메시지를 입력하세요...", key="user_input_field", max_chars=200)
         submit_button = st.form_submit_button(label='전송')
 
-        if submit_button and user_input:
-            st.session_state.user_input = user_input
-            process_user_input()
+    if submit_button and user_input:
+        process_user_input(user_input)
+        st.experimental_rerun()
 
     if st.button("대화 초기화"):
         st.session_state.conversation = []
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
-        st.session_state.submit_pressed = True
         st.experimental_rerun()
 
     st.subheader("이전 대화 기록:")
