@@ -88,6 +88,8 @@ def initialize_session_state():
         st.session_state.question_count = 0
     if 'conversation' not in st.session_state:
         st.session_state.conversation = []
+    if 'user_input' not in st.session_state:
+        st.session_state.user_input = ""
 
 # 메인 앱 로직
 def main():
@@ -109,7 +111,7 @@ def main():
             st.text_area("You:", value=message, height=100, key=f"msg_{i}", disabled=True)
 
     # 사용자 입력
-    user_input = st.text_input("메시지를 입력하세요...", key="user_input")
+    user_input = st.text_input("메시지를 입력하세요...", key="user_input", value=st.session_state.user_input)
 
     # 메시지 제출 버튼
     if st.button("전송"):
