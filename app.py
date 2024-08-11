@@ -111,24 +111,38 @@ def save_conversation(session_id, conversation):
 def get_chat_css():
     return """
     <style>
+    body {
+        background-color: #f5f5f5;
+        color: #333;
+    }
     .chat-container {
         display: flex;
         flex-direction: column;
         padding: 10px;
     }
     .message {
-        border-radius: 20px;
+        border-radius: 10px;
         padding: 10px 15px;
         margin: 5px 0;
         max-width: 75%;
+        font-size: 1em;
     }
     .user-message {
         align-self: flex-end;
-        background-color: #DCF8C6;
+        background-color: #e0f7fa;
+        color: #006064;
     }
     .coach-message {
         align-self: flex-start;
-        background-color: #E5E5EA;
+        background-color: #ffeb3b;
+        color: #f57f17;
+    }
+    .current-message {
+        border: 2px solid #4caf50;
+        background-color: #ffffff;
+        color: #212121;
+        font-size: 1.2em;
+        font-weight: bold;
     }
     </style>
     """
@@ -160,9 +174,14 @@ def main():
 
     # 대화 기록 표시
     st.markdown(get_chat_css(), unsafe_allow_html=True)
+    st.subheader("현재 질문:")
+    current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
+    st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
+
+    st.subheader("이전 대화 기록:")
     chat_container = st.container()
     with chat_container:
-        for i, message in enumerate(st.session_state.conversation):
+        for i, message in enumerate(st.session_state.conversation[:-1]):  # 마지막 대화는 현재 질문으로 표시됨
             if i % 2 == 0:
                 st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
             else:
