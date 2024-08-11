@@ -189,39 +189,43 @@ def main():
 
     submit_button, _, reset_button = st.columns([1, 1, 1])
 
-    with submit_button:
-        if st.button("전송"):
-            if user_input:
-                # 사용자 입력을 상태에 저장 후 입력 필드 초기화
-                st.session_state.conversation.append(user_input)
-                
-                try:
-                    with st.spinner("코치가 응답을 생성하고 있습니다..."):
-                        coach_response = generate_coach_response(
-                            st.session_state.conversation,
-                            st.session_state.current_stage,
-                            st.session_state.question_count
-                        )
-                        st.session_state.conversation.append(coach_response)
-                    
-                    st.session_state.question_count += 1
-                    if st.session_state.question_count >= 3:
-                        stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
-                        current_stage_index = stages.index(st.session_state.current_stage)
-                        if current_stage_index < len(stages) - 1:
-                            st.session_state.current_stage = stages[current_stage_index + 1]
-                            st.session_state.question_count = 0
-                    
-                    save_conversation(st.session_state.session_id, st.session_state.conversation)
-                except Exception as e:
-                    st.error(f"응답 생성 중 오류 발생: {str(e)}")
-                    raise
+    if submit_button.button("전송"):
+        if user_input:
+            # 사용자 입력을 상태에 저장
+            st.session_state.conversation.append(user_input)
 
-    with reset_button:
-        if st.button("대화 초기화"):
-            st.session_state.conversation = []
-            st.session_state.current_stage = 'Trust'
-            st.session_state.question_count = 0
+            try:
+                with st.spinner("코치가 응답을 생성하고 있습니다..."):
+                    coach_response = generate_coach_response(
+                        st.session_state.conversation,
+                        st.session_state.current_stage,
+                        st.session_state.question_count
+                    )
+                    st.session_state.conversation.append(coach_response)
+
+                # 대화 저장 및 단계 전환 처리
+                st.session_state.question_count += 1
+                if st.session_state.question_count >= 3:
+                    stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
+                    current_stage_index = stages.index(st.session_state.current_stage)
+                    if current_stage_index < len(stages) - 1:
+                        st.session_state.current_stage = stages[current_stage_index + 1]
+                        st.session_state.question_count = 0
+
+                save_conversation(st.session_state.session_id, st.session_state.conversation)
+
+            except Exception as e:
+                st.error(f"응답 생성 중 오류 발생: {str(e)}")
+                raise
+
+            # 새로운 질문을 자동으로 갱신
+            st.experimental_rerun()
+
+    if reset_button.button("대화 초기화"):
+        st.session_state.conversation = []
+        st.session_state.current_stage = 'Trust'
+        st.session_state.question_count = 0
+        st.experimental_rerun()
 
     # 이전 대화 기록 표시
     st.subheader("이전 대화 기록:")
