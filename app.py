@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import uuid
 from openai import OpenAI
-from pinecone import Pinecone
+from pinecone import Pinecone, ServerlessSpec
 from sentence_transformers import SentenceTransformer
 
 # 디버깅 함수
@@ -28,12 +28,17 @@ try:
 except Exception as e:
     debug_print(f"Pinecone 초기화 실패: {str(e)}")
 
-index_name = "coaching-conversations"
+index_name = "coach"
 
 # 벡터 인덱스가 존재하지 않으면 생성
 try:
     if index_name not in pc.list_indexes():
-        pc.create_index(index_name, dimension=384, metric="cosine")
+        pc.create_index(
+            name=index_name,
+            dimension=1536,
+            metric="cosine",
+            spec=ServerlessSpec(cloud="aws", region="us-east-1")
+        )
         debug_print("Pinecone 인덱스 생성 성공")
     else:
         debug_print("Pinecone 인덱스 이미 존재함")
@@ -49,7 +54,7 @@ except Exception as e:
 
 # Sentence Transformer 모델 로드
 try:
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+    model = SentenceTransformer('all-mpnet-base-v2')
     debug_print("Sentence Transformer 모델 로드 성공")
 except Exception as e:
     debug_print(f"Sentence Transformer 모델 로드 실패: {str(e)}")
