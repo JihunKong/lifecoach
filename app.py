@@ -147,6 +147,11 @@ def get_chat_css():
     .input-container {
         margin-top: 20px;
     }
+    .reset-button-container {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 10px;
+    }
     </style>
     """
 
@@ -215,11 +220,14 @@ def main():
     # 입력 처리와 상태 초기화를 위해 on_change 사용
     st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
 
+    # 초기화 버튼을 우측에 배치
+    st.markdown('<div class="reset-button-container">', unsafe_allow_html=True)
     if st.button("대화 초기화"):
         st.session_state.conversation = []
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.subheader("이전 대화 기록:")
     chat_container = st.container()
