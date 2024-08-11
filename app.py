@@ -5,7 +5,7 @@ from openai import OpenAI
 import sqlite3
 import json
 
-# Streamlit 페이지 설정 (가장 먼저 호출되어야 함)
+# Streamlit 페이지 설정
 st.set_page_config(page_title="GPT 기반 TEACHer 코칭 시스템", layout="wide")
 
 # OpenAI 클라이언트 초기화
@@ -85,52 +85,53 @@ def main():
     # 세션 관리
     if 'session_id' not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
-    session_id = st.session_state.session_id
-
-    # 세션 데이터 로드
-    current_stage, question_count, conversation = load_session_data(session_id)
-
-    # TEACHer 모델의 단계
-    stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
+        st.session_state.current_stage = 'Trust'
+        st.session_state.question_count = 0
+        st.session_state.conversation = []
+    
+    # 첫 질문 생성
+    if not st.session_state.conversation:
+        first_question = generate_coach_response([], st.session_state.current_stage, 0)
+        st.session_state.conversation.append(first_question)
 
     # 대화 기록 표시
-    for i, message in enumerate(conversation):
+    for i, message in enumerate(st.session_state.conversation):
         if i % 2 == 0:
-            st.text_area("You:", value=message, height=100, key=f"msg_{i}", disabled=True)
-        else:
             st.text_area("Coach:", value=message, height=100, key=f"msg_{i}", disabled=True)
+        else:
+            st.text_area("You:", value=message, height=100, key=f"msg_{i}", disabled=True)
 
     # 사용자 입력
     user_input = st.text_input("메시지를 입력하세요...", key="user_input")
 
     # 엔터 키 감지 및 메시지 제출
-    if user_input and user_input != st.session_state.get('previous_input', ''):
-        conversation.append(user_input)
+    if user_input:
+        st.session_state.conversation.append(user_input)
         
         # 코치 응답 생성
-        coach_response = generate_coach_response(conversation, current_stage, question_count)
-        conversation.append(coach_response)
+        coach_response = generate_coach_response(st.session_state.conversation, st.session_state.current_stage, st.session_state.question_count)
+        st.session_state.conversation.append(coach_response)
         
         # 질문 카운트 증가 및 단계 관리
-        question_count += 1
-        if question_count >= 3:
-            current_stage_index = stages.index(current_stage)
+        st.session_state.question_count += 1
+        if st.session_state.question_count >= 3:
+            stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
+            current_stage_index = stages.index(st.session_state.current_stage)
             if current_stage_index < len(stages) - 1:
-                current_stage = stages[current_stage_index + 1]
-                question_count = 0
+                st.session_state.current_stage = stages[current_stage_index + 1]
+                st.session_state.question_count = 0
         
         # 세션 데이터 저장
-        save_session_data(session_id, current_stage, question_count, conversation)
+        save_session_data(st.session_state.session_id, st.session_state.current_stage, st.session_state.question_count, st.session_state.conversation)
         
         # 입력 필드 초기화 및 페이지 새로고침
-        st.session_state.previous_input = user_input
         st.session_state.user_input = ""
         st.experimental_rerun()
 
     # 현재 세션 정보 표시 (개발용, 실제 사용 시 숨김 처리 가능)
-    st.sidebar.write(f"세션 ID: {session_id}")
-    st.sidebar.write(f"현재 단계: {current_stage}")
-    st.sidebar.write(f"질문 수: {question_count}")
+    st.sidebar.write(f"세션 ID: {st.session_state.session_id}")
+    st.sidebar.write(f"현재 단계: {st.session_state.current_stage}")
+    st.sidebar.write(f"질문 수: {st.session_state.question_count}")
 
 # 데이터베이스 초기화 및 코칭 데이터 로드
 init_db()
