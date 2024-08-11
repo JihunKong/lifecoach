@@ -63,24 +63,6 @@ def load_coach_data():
 
 coach_df = load_coach_data()
 
-# 대화 요약 함수
-def summarize_conversation(conversation):
-    summary_prompt = f"다음 대화를 요약하세요:\n\n{conversation}"
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": summary_prompt}
-            ],
-            max_tokens=100
-        )
-        summary = response.choices[0].message.content.strip()
-        return summary
-    except Exception as e:
-        st.error(f"대화 요약 중 오류 발생: {str(e)}")
-        return "요약 실패: 요약을 생성하는 데 문제가 발생했습니다."
-
 # GPT를 사용한 코칭 대화 생성 함수
 def generate_coach_response(conversation, current_stage, question_count):
     try:
@@ -171,7 +153,7 @@ def get_chat_css():
 
 # 사용자 입력 처리 콜백 함수
 def process_user_input():
-    if st.session_state.user_input:
+    if 'user_input' in st.session_state and st.session_state.user_input:
         st.session_state.conversation.append(st.session_state.user_input)
 
         try:
@@ -196,8 +178,9 @@ def process_user_input():
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
 
-        st.session_state.user_input = ""
-        st.session_state.submit_pressed = True
+        st.session_state.user_input = ""  # 입력 필드 초기화
+
+        # rerun 호출로 새로고침 처리
         st.rerun()
 
 # 첫 질문 생성 함수
@@ -247,7 +230,7 @@ def main():
     st.subheader("이전 대화 기록:")
     chat_container = st.container()
     with chat_container:
-        for i, message in enumerate(st.session_state.conversation[:-1]):
+        for i, message in enumerate(st.session_state.conversation[:-1]):  # 마지막 대화는 현재 질문으로 표시됨
             if i % 2 == 0:
                 st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
             else:
