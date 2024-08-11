@@ -2,36 +2,72 @@ import streamlit as st
 import pandas as pd
 import uuid
 from openai import OpenAI
-import pinecone
+from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
+
+# 디버깅 함수
+def debug_print(message):
+    st.sidebar.write(f"Debug: {message}")
 
 # Streamlit 페이지 설정
 st.set_page_config(page_title="GPT 기반 TEACHer 코칭 시스템", layout="wide")
 
+debug_print("페이지 설정 완료")
+
 # OpenAI 클라이언트 초기화
-client = OpenAI(api_key=st.secrets["openai"]["api_key"])
+try:
+    client = OpenAI(api_key=st.secrets["openai"]["api_key"])
+    debug_print("OpenAI 클라이언트 초기화 성공")
+except Exception as e:
+    debug_print(f"OpenAI 클라이언트 초기화 실패: {str(e)}")
 
 # Pinecone 초기화
-pinecone.init(api_key=st.secrets["pinecone"]["api_key"], environment=st.secrets["pinecone"]["environment"])
+try:
+    pc = Pinecone(api_key=st.secrets["pinecone"]["api_key"])
+    debug_print("Pinecone 초기화 성공")
+except Exception as e:
+    debug_print(f"Pinecone 초기화 실패: {str(e)}")
+
 index_name = "coaching-conversations"
 
 # 벡터 인덱스가 존재하지 않으면 생성
-if index_name not in pinecone.list_indexes():
-    pinecone.create_index(index_name, dimension=384, metric="cosine")
+try:
+    if index_name not in pc.list_indexes():
+        pc.create_index(index_name, dimension=384, metric="cosine")
+        debug_print("Pinecone 인덱스 생성 성공")
+    else:
+        debug_print("Pinecone 인덱스 이미 존재함")
+except Exception as e:
+    debug_print(f"Pinecone 인덱스 생성 실패: {str(e)}")
 
 # 벡터 인덱스 연결
-index = pinecone.Index(index_name)
+try:
+    index = pc.Index(index_name)
+    debug_print("Pinecone 인덱스 연결 성공")
+except Exception as e:
+    debug_print(f"Pinecone 인덱스 연결 실패: {str(e)}")
 
 # Sentence Transformer 모델 로드
-model = SentenceTransformer('all-MiniLM-L6-v2')
+try:
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    debug_print("Sentence Transformer 모델 로드 성공")
+except Exception as e:
+    debug_print(f"Sentence Transformer 모델 로드 실패: {str(e)}")
 
 # 코칭 데이터 로드
 @st.cache_data
 def load_coach_data():
-    return pd.read_excel('coach.xlsx')
+    try:
+        data = pd.read_excel('coach.xlsx')
+        debug_print("코칭 데이터 로드 성공")
+        return data
+    except Exception as e:
+        debug_print(f"코칭 데이터 로드 실패: {str(e)}")
+        return pd.DataFrame()
 
 # GPT를 사용한 코칭 대화 생성 함수
 def generate_coach_response(conversation, current_stage, question_count):
+    debug_print(f"대화 생성 시작: 단계 {current_stage}, 질문 수 {question_count}")
     stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
     available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
     available_questions = [q for q in available_questions if pd.notnull(q)]
@@ -39,9 +75,13 @@ def generate_coach_response(conversation, current_stage, question_count):
     # 최근 대화 내용을 벡터화하여 유사한 과거 대화 검색
     recent_conversation = " ".join(conversation[-5:])
     query_vector = model.encode(recent_conversation).tolist()
-    results = index.query(query_vector, top_k=3, include_metadata=True)
-    
-    similar_conversations = [item['metadata']['conversation'] for item in results['matches']]
+    try:
+        results = index.query(vector=query_vector, top_k=3, include_metadata=True)
+        similar_conversations = [item['metadata']['conversation'] for item in results['matches']]
+        debug_print("유사한 대화 검색 성공")
+    except Exception as e:
+        debug_print(f"유사한 대화 검색 실패: {str(e)}")
+        similar_conversations = []
     
     prompt = f"""You are an empathetic life coach using the TEACHer model. 
     Current stage: {current_stage}
@@ -63,9 +103,11 @@ def generate_coach_response(conversation, current_stage, question_count):
             model="gpt-4",
             messages=[{"role": "system", "content": prompt}]
         )
-        return completion.choices[0].message.content.strip()
+        response = completion.choices[0].message.content.strip()
+        debug_print("GPT 응답 생성 성공")
+        return response
     except Exception as e:
-        st.error(f"GPT API 호출 중 오류 발생: {str(e)}")
+        debug_print(f"GPT API 호출 중 오류 발생: {str(e)}")
         return "죄송합니다. 응답을 생성하는 데 문제가 발생했습니다."
 
 # 세션 상태 초기화 함수
@@ -80,6 +122,7 @@ def initialize_session_state():
         st.session_state.conversation = []
     if 'user_input' not in st.session_state:
         st.session_state.user_input = ""
+    debug_print("세션 상태 초기화 완료")
 
 # 대화 초기화 함수
 def reset_conversation():
@@ -88,12 +131,17 @@ def reset_conversation():
     st.session_state.question_count = 0
     st.session_state.conversation = []
     st.session_state.user_input = ""
+    debug_print("대화 초기화 완료")
 
 # 대화 저장 함수
 def save_conversation(session_id, conversation):
     conversation_text = " ".join(conversation)
     vector = model.encode(conversation_text).tolist()
-    index.upsert([(session_id, vector, {"conversation": conversation})])
+    try:
+        index.upsert(vectors=[(session_id, vector, {"conversation": conversation})])
+        debug_print("대화 저장 성공")
+    except Exception as e:
+        debug_print(f"대화 저장 실패: {str(e)}")
 
 # 메인 앱 로직
 def main():
@@ -106,6 +154,7 @@ def main():
     if not st.session_state.conversation:
         first_question = generate_coach_response([], st.session_state.current_stage, 0)
         st.session_state.conversation.append(first_question)
+        debug_print("첫 질문 생성 완료")
 
     # 대화 기록 표시
     for i, message in enumerate(st.session_state.conversation):
@@ -121,10 +170,12 @@ def main():
     if st.button("전송"):
         if user_input:
             st.session_state.conversation.append(user_input)
+            debug_print("사용자 입력 추가")
             
             # 코치 응답 생성
             coach_response = generate_coach_response(st.session_state.conversation, st.session_state.current_stage, st.session_state.question_count)
             st.session_state.conversation.append(coach_response)
+            debug_print("코치 응답 생성 및 추가")
             
             # 질문 카운트 증가 및 단계 관리
             st.session_state.question_count += 1
@@ -134,6 +185,7 @@ def main():
                 if current_stage_index < len(stages) - 1:
                     st.session_state.current_stage = stages[current_stage_index + 1]
                     st.session_state.question_count = 0
+                    debug_print(f"다음 단계로 이동: {st.session_state.current_stage}")
             
             # 대화 저장
             save_conversation(st.session_state.session_id, st.session_state.conversation)
