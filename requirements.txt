@@ -3,3 +3,4 @@ pandas
 openpyxl
 openai
 uuid
+pinecone-client sentence-transformers
