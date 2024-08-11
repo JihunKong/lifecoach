@@ -214,7 +214,7 @@ def main():
 
     if submit_button and user_input:
         process_user_input(user_input)
-        st.experimental_rerun()
+        st_rerun()
 
     if st.button("대화 초기화"):
         st.session_state.conversation = []
