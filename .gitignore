@@ -1,0 +1,16 @@
+# Python 캐시 파일
+__pycache__/
+*.pyc
+
+# 환경 변수 파일
+.env
+
+# SQLite 데이터베이스 파일
+*.db
+
+# Streamlit 캐시
+.streamlit/
+
+# 기타 시스템 파일
+.DS_Store
+Thumbs.db
