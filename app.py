@@ -170,7 +170,7 @@ def get_chat_css():
     """
 
 # 사용자 입력 처리 콜백 함수
-def user_input_callback():
+def process_user_input():
     if st.session_state.user_input:
         st.session_state.conversation.append(st.session_state.user_input)
 
@@ -221,16 +221,11 @@ def main():
 
     # 사용자 입력 처리 폼
     with st.form(key='my_form'):
-        user_input = st.text_input(
-            "메시지를 입력하세요...", 
-            key="user_input", 
-            max_chars=200,
-            on_change=user_input_callback  # 콜백 함수 등록
-        )
+        user_input = st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200)
         submit_button = st.form_submit_button(label='전송')
 
         if submit_button:
-            user_input_callback()
+            process_user_input()
 
     if st.button("대화 초기화"):
         st.session_state.conversation = []
