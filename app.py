@@ -164,9 +164,10 @@ def main():
     user_input = st.text_input("메시지를 입력하세요...", key="user_input", on_change=clear_input)
 
     # 메시지 제출 버튼
-    if st.button("전송", key="send_button"):
-        if user_input:
-            st.session_state.conversation.append(user_input)
+    if st.button("전송", key="send_button") or user_input:  # 버튼 클릭 또는 Enter 키 입력 시
+        if st.session_state.user_input:  # session_state에서 입력값 확인
+            user_message = st.session_state.user_input
+            st.session_state.conversation.append(user_message)
             
             with st.spinner("코치가 응답을 생성하고 있습니다..."):
                 # 코치 응답 생성
