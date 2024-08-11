@@ -90,7 +90,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         Your response should be in Korean and should flow naturally without any labels or markers."""
         
         completion = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip() 
