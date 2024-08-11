@@ -96,7 +96,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         return completion.choices[0].message.content.strip() 
     except Exception as e:
         st.error(f"GPT API 호출 중 오류 발생: {str(e)}")
-        raise
+        return "죄송합니다. 응답을 생성하는 데 문제가 발생했습니다. 다시 시도해 주세요."
 
 # 대화 저장 함수
 def save_conversation(session_id, conversation):
@@ -106,7 +106,6 @@ def save_conversation(session_id, conversation):
         index.upsert(vectors=[(session_id, vector, {"conversation": conversation})])
     except Exception as e:
         st.error(f"대화 저장 실패: {str(e)}")
-        raise
 
 # CSS for chat layout
 def get_chat_css():
@@ -154,7 +153,8 @@ def get_chat_css():
 # 사용자 입력 처리 콜백 함수
 def process_user_input():
     if 'user_input' in st.session_state and st.session_state.user_input:
-        st.session_state.conversation.append(st.session_state.user_input)
+        user_input = st.session_state.user_input
+        st.session_state.conversation.append(user_input)
 
         try:
             with st.spinner("코치가 응답을 생성하고 있습니다..."):
@@ -178,8 +178,11 @@ def process_user_input():
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
 
-        st.session_state.user_input = ""  # 입력 필드 초기화
-        st.rerun()
+        # Reset user input after processing
+        if 'user_input' in st.session_state:
+            del st.session_state.user_input
+
+        st.experimental_rerun()
 
 # 첫 질문 생성 함수
 def generate_first_question():
@@ -187,7 +190,7 @@ def generate_first_question():
         first_question = generate_coach_response([], st.session_state.current_stage, 0)
         st.session_state.conversation.append(first_question)
         st.session_state.submit_pressed = True
-        st.rerun()
+        st.experimental_rerun()
     except Exception as e:
         st.error(f"첫 질문 생성 중 오류 발생: {str(e)}")
 
@@ -195,6 +198,7 @@ def generate_first_question():
 def main():
     st.title("AI 코칭 시스템")
 
+    # Initialize session state variables
     if 'session_id' not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
     if 'current_stage' not in st.session_state:
@@ -203,8 +207,6 @@ def main():
         st.session_state.question_count = 0
     if 'conversation' not in st.session_state:
         st.session_state.conversation = []
-    if 'user_input' not in st.session_state:
-        st.session_state.user_input = ""
     if 'submit_pressed' not in st.session_state:
         st.session_state.submit_pressed = False
 
@@ -217,11 +219,13 @@ def main():
     current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
     st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
 
-    with st.form(key='my_form'):
+    # Use st.form for user input
+    with st.form(key='chat_form'):
         user_input = st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200)
         submit_button = st.form_submit_button(label='전송')
 
-        if submit_button:
+        if submit_button and user_input:
+            st.session_state.user_input = user_input
             process_user_input()
 
     if st.button("대화 초기화"):
@@ -229,7 +233,7 @@ def main():
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
         st.session_state.submit_pressed = True
-        st.rerun()
+        st.experimental_rerun()
 
     st.subheader("이전 대화 기록:")
     chat_container = st.container()
