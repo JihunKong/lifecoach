@@ -62,9 +62,16 @@ def load_coach_data():
 
 coach_df = load_coach_data()
 
+# 대화 요약 함수
+def summarize_conversation(conversation):
+    if len(conversation) > 5:
+        return conversation[:2] + ["...이전 대화 요약..."] + conversation[-2:]
+    return conversation
+
 # GPT를 사용한 코칭 대화 생성 함수
 def generate_coach_response(conversation, current_stage, question_count):
     try:
+        conversation = summarize_conversation(conversation)
         stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
         available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
         available_questions = [q for q in available_questions if pd.notnull(q)]
