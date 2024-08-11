@@ -156,11 +156,13 @@ def main():
 
     # 대화 기록 표시
     st.markdown(get_chat_css(), unsafe_allow_html=True)
-    for i, message in enumerate(st.session_state.conversation):
-        if i % 2 == 0:
-            st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
+    chat_container = st.container()
+    with chat_container:
+        for i, message in enumerate(st.session_state.conversation):
+            if i % 2 == 0:
+                st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
 
     # 사용자 입력
     user_input = st.text_input("메시지를 입력하세요...", key="user_input")
@@ -191,14 +193,13 @@ def main():
             except Exception as e:
                 st.error(f"응답 생성 중 오류 발생: {str(e)}")
             
-            st.experimental_rerun()
+            st.session_state.user_input = ""  # 입력 필드 초기화
 
     # 대화 초기화 버튼
     if st.button("대화 초기화", key="reset_button"):
         st.session_state.conversation = []
         st.session_state.current_stage = 'Trust'
         st.session_state.question_count = 0
-        st.experimental_rerun()
 
 # 메인 앱 실행
 if __name__ == "__main__":
