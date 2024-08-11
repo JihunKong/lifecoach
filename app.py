@@ -172,7 +172,7 @@ def process_user_input(user_input):
                     st.session_state.question_count = 0
 
             save_conversation(st.session_state.session_id, st.session_state.conversation)
-            st.experimental_rerun()  # 이곳에 st.experimental_rerun()을 추가
+            st.rerun() 
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
 
@@ -181,7 +181,7 @@ def generate_first_question():
     try:
         first_question = generate_coach_response([], st.session_state.current_stage, 0)
         st.session_state.conversation.append(first_question)
-        st.experimental_rerun()
+        st.rerun()
     except Exception as e:
         st.error(f"첫 질문 생성 중 오류 발생: {str(e)}")
 
