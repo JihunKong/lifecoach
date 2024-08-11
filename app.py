@@ -2,14 +2,54 @@ import streamlit as st
 import pandas as pd
 import uuid
 from openai import OpenAI
+import sqlite3
+import json
 
 # Streamlit secrets에서 OpenAI API 키 가져오기
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
+
+# 데이터베이스 연결 함수
+def get_db_connection():
+    conn = sqlite3.connect('coaching_sessions.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# 데이터베이스 초기화 함수
+def init_db():
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS sessions
+                 (id TEXT PRIMARY KEY, stage TEXT, question_count INTEGER, answers TEXT)''')
+    conn.commit()
+    conn.close()
+
+# 세션 데이터 저장 함수
+def save_session_data(session_id, stage, question_count, answers):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?)",
+              (session_id, stage, question_count, json.dumps(answers)))
+    conn.commit()
+    conn.close()
+
+# 세션 데이터 로드 함수
+def load_session_data(session_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM sessions WHERE id = ?", (session_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return row['stage'], row['question_count'], json.loads(row['answers'])
+    return None, None, None
 
 # 코칭 질문 엑셀 파일 읽기
 @st.cache_data
 def load_coach_data():
     return pd.read_excel('coach.xlsx')
+
+# 데이터베이스 초기화
+init_db()
 
 coach_df = load_coach_data()
 
@@ -21,16 +61,20 @@ if 'session_id' not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 session_id = st.session_state.session_id
 
+# 세션 데이터 로드
+stage, question_count, answers = load_session_data(session_id)
+if stage is None:
+    stage = 'Trust'
+    question_count = 0
+    answers = []
+
+# 현재 상태 설정
+st.session_state[f'{session_id}_stage'] = stage
+st.session_state[f'{session_id}_question_count'] = question_count
+st.session_state[f'{session_id}_answers'] = answers
+
 # TEACHer 모델의 단계
 stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
-
-# 현재 단계 설정
-if f'{session_id}_stage' not in st.session_state:
-    st.session_state[f'{session_id}_stage'] = 'Trust'
-if f'{session_id}_question_count' not in st.session_state:
-    st.session_state[f'{session_id}_question_count'] = 0
-if f'{session_id}_answers' not in st.session_state:
-    st.session_state[f'{session_id}_answers'] = []
 
 # 단계별 코칭 질문을 GPT로 선택하는 함수
 def suggest_coaching_question(stage, previous_answers):
@@ -101,9 +145,16 @@ if st.button("다음 질문"):
                 st.session_state[f'{session_id}_stage'] = stages[current_stage_index + 1]
                 st.session_state[f'{session_id}_question_count'] = 0
                 st.session_state[f'{session_id}_answers'] = []
-                st.experimental_rerun()
             else:
                 st.write("모든 단계가 완료되었습니다. 코칭이 종료되었습니다.")
+        
+        # 데이터베이스에 저장
+        save_session_data(session_id, 
+                          st.session_state[f'{session_id}_stage'],
+                          st.session_state[f'{session_id}_question_count'],
+                          st.session_state[f'{session_id}_answers'])
+        
+        st.experimental_rerun()
     else:
         st.write("먼저 답변을 입력하세요!")
 
