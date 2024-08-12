@@ -89,19 +89,16 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         # 현재 단계에서 질문 수가 최소 질문 수를 초과하고, 마지막 단계가 아닌 경우
         if question_count >= min_questions_per_stage and current_stage_index < len(TEACHER_STAGES) - 1:
             next_stage = TEACHER_STAGES[current_stage_index + 1]
-            return f"이제 {current_stage} 단계를 마치고 {next_stage} 단계로 넘어가겠습니다. {next_stage} 단계에서는 어떤 점을 중점적으로 다루고 싶으신가요?"
+            st.session_state.current_stage = next_stage
+            st.session_state.question_count = 0
 
         # 마지막 단계이고 최소 질문 수를 충족한 경우
         if current_stage_index == len(TEACHER_STAGES) - 1 and question_count >= min_questions_per_stage:
-            return "모든 단계를 완료했습니다. 전체 코칭 과정을 통해 어떤 점을 깨닫거나 배우셨나요? 마지막으로 느낀 점을 공유해 주시겠어요?"
-
-        # 마지막 질문에 대한 사용자의 응답 후 코칭 종료
-        if "모든 단계를 완료했습니다." in conversation[-2]:
             st.session_state.coaching_finished = True
-            return "코칭 세션이 끝났습니다. 귀하의 성장과 발전을 응원합니다. 추가 코칭이 필요하시면 언제든 새로운 세션을 시작해 주세요."
+            return "우리의 대화를 통해 많은 것을 배우고 깨닫셨길 바랍니다. 이번 코칭 세션에서 가장 중요하게 느낀 점이나 앞으로 실천하고 싶은 것이 있다면 무엇인가요?"
 
         # 기존 응답 생성 로직
-        stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
+        stage_questions = coach_df[coach_df['step'].str.contains(st.session_state.current_stage, case=False, na=False)]
         available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
         available_questions = [q for q in available_questions if pd.notnull(q)]
         
@@ -118,17 +115,18 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         similar_user_conversations = [item['metadata']['conversation'] for item in user_results['matches'] if 'metadata' in item and 'conversation' in item['metadata']]
       
         prompt = f"""당신은 TEACHer 모델을 사용하는 공감적인 라이프 코치입니다. 
-        현재 단계: {current_stage}
-        질문 횟수: {question_count}
+        현재 단계: {st.session_state.current_stage}
+        질문 횟수: {st.session_state.question_count}
         이전 대화: {conversation[-5:] if len(conversation) > 5 else conversation}
         사용자의 유사한 과거 대화를 기반으로 자연스럽고 공감적인 응답을 생성하세요.
 
         다음 지침을 엄격히 따르세요:
         1. 응답은 한국어로 작성하고, 레이블이나 마커 없이 자연스럽게 흘러가야 합니다.
         2. 사용자를 단수 형태(예: '당신', '귀하')로 지칭하세요.
-        3. 반드시 하나의 질문만 생성하세요. 이 질문은 현재 단계와 관련되어야 하며, 이전 질문들과 중복되지 않아야 합니다. 질문 시에는 대화의 흐름을 자연스럽게 유지하고, 제공된 파일을 창의적으로 응용하여 적절하게 제시합니다.
-        4. 현재 단계의 목표 달성도를 평가하고, 필요시 다음 단계로의 전환을 고려하세요.
-        5. 각 단계에서 최소 {min_questions_per_stage}개의 질문을 하기 전에는 다음 단계로 넘어가지 마세요.
+        3. 반드시 하나의 질문만 생성하세요. 이 질문은 현재 단계와 관련되어야 하며, 이전 질문들과 중복되지 않아야 합니다.
+        4. 질문 시에는 대화의 흐름을 자연스럽게 유지하고, 제공된 파일을 창의적으로 응용하여 적절하게 제시합니다.
+        5. 단계 전환을 명시적으로 언급하지 마세요. 자연스럽게 다음 단계의 질문으로 넘어가세요.
+        6. 코치의 역할을 유지하면서도, 마치 친구와 대화하는 것처럼 편안하고 자연스러운 톤을 유지하세요.
 
         응답 형식:
         [코치의 응답]
@@ -224,12 +222,6 @@ def process_user_input():
             # 질문 횟수 증가
             st.session_state.question_count += 1
 
-            # 다음 단계로 넘어가는 경우
-            if "단계로 넘어가겠습니다" in coach_response:
-                next_stage = coach_response.split()[2]  # "Trust 단계로 넘어가겠습니다." 에서 "Trust" 추출
-                st.session_state.current_stage = next_stage
-                st.session_state.question_count = 0
-
             save_conversation(st.session_state.user, st.session_state.conversation)
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
@@ -237,7 +229,7 @@ def process_user_input():
             st.session_state.user_input = ""  # 입력창 비우기
 
         if st.session_state.coaching_finished:
-            st.success("코칭이 종료되었습니다. 대화를 초기화하고 새로운 세션을 시작하시겠습니까?")
+            st.success("코칭이 종료되었습니다. 새로운 세션을 시작하시겠습니까?")
             if st.button("새 세션 시작"):
                 st.session_state.conversation = []
                 st.session_state.current_stage = 'Trust'
@@ -248,7 +240,7 @@ def process_user_input():
 
 # 첫 질문 생성 함수
 def generate_first_question():
-    st.session_state.conversation.append("안녕하세요, 당신을 위한 라이프 코치입니다. 오늘 기분은 어떠세요?")
+    st.session_state.conversation.append("안녕하세요, 저는 당신의 개인 코치입니다. 오늘 어떤 이야기를 나누고 싶으신가요?")
 
 # 사용자 인증 관련 함수
 def hash_password(password):
@@ -331,7 +323,7 @@ def main():
         if 'coaching_finished' not in st.session_state:
             st.session_state.coaching_finished = False
 
-        st.subheader("현재 질문:")
+        st.subheader("대화창:")
         current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
         st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
 
@@ -339,7 +331,7 @@ def main():
             # 입력 처리와 상태 초기화를 위해 on_change 사용
             st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
         else:
-            st.success("코칭이 종료되었습니다. 대화를 초기화하고 새로운 세션을 시작하시겠습니까?")
+            st.success("코칭이 종료되었습니다. 새로운 세션을 시작하시겠습니까?")
             if st.button("새 세션 시작"):
                 st.session_state.conversation = []
                 st.session_state.current_stage = 'Trust'
@@ -357,11 +349,7 @@ def main():
             generate_first_question()  # 첫 대화 생성
             st.rerun()
 
-        # 현재 단계 표시
-        st.sidebar.subheader("현재 단계")
-        st.sidebar.write(st.session_state.current_stage)
-
-        # 이전 대화 기록을 현재 질문과 채팅창 아래로 이동
+        # 이전 대화 기록 표시
         st.subheader("이전 대화 기록:")
         chat_container = st.container()
         with chat_container:
