@@ -97,6 +97,10 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
             st.session_state.coaching_finished = True
             return "우리의 대화를 통해 많은 것을 배우고 깨닫셨길 바랍니다. 이번 코칭 세션에서 가장 중요하게 느낀 점이나 앞으로 실천하고 싶은 것이 있다면 무엇인가요?"
 
+        # 사용자의 마지막 응답 후 코칭 종료
+        if st.session_state.coaching_finished:
+            return "그러한 깨달음을 통해 당신의 삶이 보다 윤택해지기를 기원합니다. 코칭을 종료하겠습니다. 감사합니다."
+
         # 기존 응답 생성 로직
         stage_questions = coach_df[coach_df['step'].str.contains(st.session_state.current_stage, case=False, na=False)]
         available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
@@ -140,7 +144,6 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
     except Exception as e:
         st.error(f"GPT API 호출 중 오류 발생: {str(e)}")
         return "죄송합니다. 응답을 생성하는 데 문제가 발생했습니다. 다시 시도해 주세요."
-
 # CSS for chat layout
 def get_chat_css():
     return """
@@ -331,23 +334,7 @@ def main():
             # 입력 처리와 상태 초기화를 위해 on_change 사용
             st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
         else:
-            st.success("코칭이 종료되었습니다. 새로운 세션을 시작하시겠습니까?")
-            if st.button("새 세션 시작"):
-                st.session_state.conversation = []
-                st.session_state.current_stage = 'Trust'
-                st.session_state.question_count = 0
-                st.session_state.coaching_finished = False
-                generate_first_question()  # 첫 대화 생성
-                st.rerun()
-
-        # 대화 초기화 버튼 추가
-        if st.button("대화 초기화"):
-            st.session_state.conversation = []
-            st.session_state.current_stage = 'Trust'
-            st.session_state.question_count = 0
-            st.session_state.coaching_finished = False
-            generate_first_question()  # 첫 대화 생성
-            st.rerun()
+            st.success("코칭이 종료되었습니다. 새로운 세션을 시작하려면 페이지를 새로고침 해주세요.")
 
         # 이전 대화 기록 표시
         st.subheader("이전 대화 기록:")
