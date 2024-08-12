@@ -128,7 +128,7 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         """
         
         completion = client.chat.completions.create(
-            model="gpt-4-0314",
+            model="gpt-4o-mini",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip()
@@ -336,7 +336,7 @@ def main():
         current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
         st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
 
-        if not st.session_state.coaching_finished
+        if not st.session_state.coaching_finished:
             # 입력 처리와 상태 초기화를 위해 on_change 사용
             st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
         else:
