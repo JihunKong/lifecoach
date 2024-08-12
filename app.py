@@ -4,6 +4,7 @@ import uuid
 import openai
 from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
+import time
 
 # Streamlit 페이지 설정
 st.set_page_config(page_title="AI 코칭 시스템", layout="wide")
@@ -201,12 +202,24 @@ def process_user_input():
 
 # 첫 질문 생성 함수
 def generate_first_question():
-    try:
-        first_question = generate_coach_response([], st.session_state.current_stage, 0, st.session_state.session_id)
-        st.session_state.conversation.append(first_question)
-        st.rerun()
-    except Exception as e:
-        st.error(f"첫 질문 생성 중 오류 발생: {str(e)}")
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            first_question = generate_coach_response([], st.session_state.current_stage, 0, st.session_state.session_id)
+            if first_question:
+                st.session_state.conversation.append(first_question)
+                return
+            else:
+                st.warning("첫 질문 생성에 실패했습니다. 다시 시도합니다.")
+        except Exception as e:
+            st.error(f"첫 질문 생성 중 오류 발생 (시도 {attempt + 1}/{max_retries}): {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(2)  # 재시도 전 잠시 대기
+            else:
+                st.error("첫 질문을 생성할 수 없습니다. 시스템 관리자에게 문의해주세요.")
+                st.session_state.conversation.append("안녕하세요. 지금은 시스템에 일시적인 문제가 있습니다. 어떤 도움이 필요하신가요?")
+
+    st.rerun()
 
 # 메인 앱 로직
 def main():
