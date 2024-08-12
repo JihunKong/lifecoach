@@ -74,6 +74,7 @@ def load_coach_data():
         return pd.DataFrame()
 
 coach_df = load_coach_data()
+
 def generate_coach_response(conversation, current_stage, question_count, username):
     try:
         stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
@@ -92,41 +93,34 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         )
         similar_user_conversations = [item['metadata']['conversation'] for item in user_results['matches'] if 'metadata' in item and 'conversation' in item['metadata']]
         
-        # 다른 사용자의 대화 중 랜덤으로 하나 선택
-        other_results = index.query(
-            vector=query_vector,
-            top_k=10,
-            filter={"username": {"$ne": username}},
-            include_metadata=True
-        )
-        other_conversations = [item['metadata']['conversation'] for item in other_results['matches'] if 'metadata' in item and 'conversation' in item['metadata']]
-        random_other_conversation = random.choice(other_conversations) if other_conversations else None
+        prompt = f"""당신은 TEACHer 모델을 사용하는 공감적인 라이프 코치입니다. 
+        현재 단계: {current_stage}
+        질문 횟수: {question_count}
+        이전 대화: {conversation[-5:] if len(conversation) > 5 else conversation}
+        사용자의 유사한 과거 대화: {similar_user_conversations}
         
-        prompt = f"""You are an empathetic life coach using the TEACHer model. 
-        Current stage: {current_stage}
-        Question count: {question_count}
-        Previous conversation: {conversation[-5:] if len(conversation) > 5 else conversation}
-        Similar past conversations of the current user: {similar_user_conversations}
+        사용자의 응답과 유사한 과거 대화를 기반으로 자연스럽고 공감적인 응답을 생성하세요.
+        그 후, 현재 단계와 관련된 하나의 후속 질문을 하되, 이전 질문들과 중복되지 않고 대화의 흐름에 자연스럽게 이어지도록 하세요.
         
-        Based on the user's responses and similar past conversations, generate a natural, empathetic response.
-        Then, ask a single follow-up question related to the current stage that naturally flows from the conversation.
-        Choose from or create a question similar to these for the current stage:
-        {available_questions}
+        다음 지침을 따르세요:
+        1. 응답은 한국어로 작성하고, 레이블이나 마커 없이 자연스럽게 흘러가야 합니다.
+        2. 사용자를 단수 형태(예: '당신', '귀하')로 지칭하세요.
+        3. 질문은 반드시 하나만 하고, 텍스트 내에 볼드 마크다운을 사용하여 강조하세요.
+        4. 현재 단계의 목표 달성도를 평가하고, 필요시 다음 단계로의 전환을 고려하세요.
+        5. 이전 질문들과 다른 관점이나 주제를 탐색하여 대화의 다양성을 높이세요.
         
-        Your response should be in Korean and should flow naturally without any labels or markers.
-        Address the user in singular form (e.g., '당신', '귀하') instead of plural ('여러분').
+        만약 현재 단계의 목표가 충분히 달성되었다고 판단되면, 사용자에게 지금까지의 대화를 요약하고 다음 단계로 넘어갈 준비가 되었는지 물어보세요.
         
-        Make sure to ask only ONE question at a time.
-        Format the question using bold markdown within the text, not as a separate label.
+        응답 형식:
+        [코치의 응답]
+        **[후속 질문]**
         
-        If this is the last question in the current stage (question count is 3 to 5), ask the user to summarize the conversation so far and if they have any more topics to discuss before moving to the next stage.
-        
-        If appropriate, you may occasionally mention: "다른 사용자 분이 '{random_other_conversation}' 라는 이야기를 하셨는데, 이에 대해 어떻게 생각하시나요?"
-        However, this should not be your main question, but part of the context or conversation.
+        단계 달성도: [0-100 사이의 숫자]
+        다음 단계 준비 여부: [예/아니오]
         """
         
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4-0314",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip()
