@@ -182,6 +182,26 @@ def get_chat_css():
     """
 
 # 사용자 입력 처리 함수 수정
+def save_conversation(username, conversation):
+    conversation_text = " ".join(conversation)
+    vector = create_vector(conversation_text)
+    try:
+        index.upsert(
+            vectors=[
+                {
+                    'id': f"{username}_{uuid.uuid4()}",
+                    'values': vector,
+                    'metadata': {
+                        'conversation': conversation_text,
+                        'username': username
+                    }
+                }
+            ]
+        )
+    except Exception as e:
+        st.error(f"대화 저장 실패: {str(e)}")
+
+# 사용자 입력 처리 함수 수정
 def process_user_input():
     user_input = st.session_state.user_input
     if user_input:
