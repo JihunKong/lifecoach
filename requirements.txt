@@ -1,6 +1,6 @@
 streamlit
 pandas
-openpyxl
 openai
 pinecone-client
 sentence-transformers
+openpyxl
