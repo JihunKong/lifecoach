@@ -348,13 +348,13 @@ def main():
                 st.session_state.question_count = 0
                 st.session_state.coaching_finished = False
                 generate_first_question()  # 첫 대화 생성
-                st.experimental_rerun()
+                st.rerun()
 
         # 대화 초기화 버튼 추가
         if st.button("대화 초기화"):
             st.session_state.conversation = []
             generate_first_question()  # 첫 대화 생성
-            st.experimental_rerun()
+            st.rerun()
 
         # 이전 대화 기록을 현재 질문과 채팅창 아래로 이동
         st.subheader("이전 대화 기록:")
