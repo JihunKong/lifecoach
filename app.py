@@ -74,8 +74,6 @@ def load_coach_data():
         return pd.DataFrame()
 
 coach_df = load_coach_data()
-
-# GPT를 사용한 코칭 대화 생성 함수
 def generate_coach_response(conversation, current_stage, question_count, username):
     try:
         stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
@@ -111,7 +109,7 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         Similar past conversations of the current user: {similar_user_conversations}
         
         Based on the user's responses and similar past conversations, generate a natural, empathetic response.
-        Then, ask a single follow-up question related to the current stage.
+        Then, ask a single follow-up question related to the current stage that naturally flows from the conversation.
         Choose from or create a question similar to these for the current stage:
         {available_questions}
         
@@ -119,7 +117,7 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         Address the user in singular form (e.g., '당신', '귀하') instead of plural ('여러분').
         
         Make sure to ask only ONE question at a time.
-        Format the question using bold markdown within the text, not as a separate "질문:" label.
+        Format the question using bold markdown within the text, not as a separate label.
         
         If this is the last question in the current stage (question count is 3 to 5), ask the user to summarize the conversation so far and if they have any more topics to discuss before moving to the next stage.
         
