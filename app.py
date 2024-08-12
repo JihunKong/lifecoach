@@ -119,14 +119,16 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         Address the user in singular form (e.g., '당신', '귀하') instead of plural ('여러분').
         
         Make sure to ask only ONE question at a time.
-        Format the question using bold markdown: **질문**
+        Format the question using bold markdown within the text, not as a separate "질문:" label.
+        
+        If this is the last question in the current stage (question count is 3 to 5), ask the user to summarize the conversation so far and if they have any more topics to discuss before moving to the next stage.
         
         If appropriate, you may occasionally mention: "다른 사용자 분이 '{random_other_conversation}' 라는 이야기를 하셨는데, 이에 대해 어떻게 생각하시나요?"
         However, this should not be your main question, but part of the context or conversation.
         """
         
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4-0314",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip()
@@ -153,31 +155,6 @@ def save_conversation(username, conversation):
         )
     except Exception as e:
         st.error(f"대화 저장 실패: {str(e)}")
-
-# 이전 대화 요약 함수 (숨김 처리)
-def summarize_previous_conversation(username):
-    try:
-        results = index.query(
-            vector=[0]*1536,  # 더미 벡터, 실제로는 사용되지 않음
-            top_k=1,
-            filter={"username": username},
-            include_metadata=True
-        )
-        if results['matches']:
-            match = results['matches'][0]
-            if 'metadata' in match and 'conversation' in match['metadata']:
-                previous_conversation = match['metadata']['conversation']
-                prompt = f"""이전 대화를 요약해주세요. 핵심 내용만 간략하게 정리해 주세요.
-                이전 대화: {previous_conversation}"""
-                
-                completion = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "system", "content": prompt}]
-                )
-                return completion.choices[0].message.content.strip()
-    except Exception as e:
-        st.error(f"이전 대화 요약 중 오류 발생: {str(e)}")
-    return None
 
 # CSS for chat layout
 def get_chat_css():
@@ -238,12 +215,14 @@ def process_user_input():
                 st.session_state.conversation.append(coach_response)
 
             st.session_state.question_count += 1
-            if st.session_state.question_count >= 3:
+            if st.session_state.question_count >= 5:
                 stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
                 current_stage_index = stages.index(st.session_state.current_stage)
                 if current_stage_index < len(stages) - 1:
                     st.session_state.current_stage = stages[current_stage_index + 1]
                     st.session_state.question_count = 0
+                else:
+                    st.session_state.coaching_finished = True
 
             save_conversation(st.session_state.user, st.session_state.conversation)
         except Exception as e:
@@ -319,6 +298,7 @@ def logout_user():
     st.session_state.conversation = []
     st.session_state.current_stage = 'Trust'
     st.session_state.question_count = 0
+    st.session_state.coaching_finished = False
     st.info("로그아웃되었습니다.")
     st.rerun()
 
@@ -346,6 +326,8 @@ def main():
             st.session_state.current_stage = 'Trust'
         if 'question_count' not in st.session_state:
             st.session_state.question_count = 0
+        if 'coaching_finished' not in st.session_state:
+            st.session_state.coaching_finished = False
 
         if not st.session_state.conversation:
             generate_first_question()
@@ -354,18 +336,16 @@ def main():
         current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
         st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
 
-        # 입력 처리와 상태 초기화를 위해 on_change 사용
-        st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
-
-        # 초기화 버튼을 우측에 배치
-        col1, col2 = st.columns([0.8, 0.2])
-        with col1:
-            st.write("")  # 왼쪽 공간 확보용
-        with col2:
-            if st.button("대화 초기화"):
+        if not st.session_state.coaching_finished
+            # 입력 처리와 상태 초기화를 위해 on_change 사용
+            st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
+        else:
+            st.success("코칭이 종료되었습니다. 대화를 초기화하고 새로운 세션을 시작하시겠습니까?")
+            if st.button("새 세션 시작"):
                 st.session_state.conversation = []
                 st.session_state.current_stage = 'Trust'
                 st.session_state.question_count = 0
+                st.session_state.coaching_finished = False
                 st.rerun()
 
         # 이전 대화 기록을 현재 질문과 채팅창 아래로 이동
