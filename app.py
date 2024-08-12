@@ -7,6 +7,7 @@ from sentence_transformers import SentenceTransformer
 import time
 import sqlite3
 import hashlib
+import random
 
 # Streamlit 페이지 설정
 st.set_page_config(page_title="AI 코칭 시스템", layout="wide")
@@ -75,7 +76,7 @@ def load_coach_data():
 coach_df = load_coach_data()
 
 # GPT를 사용한 코칭 대화 생성 함수
-def generate_coach_response(conversation, current_stage, question_count):
+def generate_coach_response(conversation, current_stage, question_count, username):
     try:
         stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
         available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
@@ -84,14 +85,30 @@ def generate_coach_response(conversation, current_stage, question_count):
         recent_conversation = " ".join(conversation[-5:])
         query_vector = create_vector(recent_conversation)
         
-        results = index.query(vector=query_vector, top_k=3, include_metadata=True)
-        similar_conversations = [item['metadata']['conversation'] for item in results['matches'] if 'metadata' in item and 'conversation' in item['metadata']]
+        # 현재 사용자의 대화 벡터만 검색
+        user_results = index.query(
+            vector=query_vector,
+            top_k=3,
+            filter={"username": username},
+            include_metadata=True
+        )
+        similar_user_conversations = [item['metadata']['conversation'] for item in user_results['matches'] if 'metadata' in item and 'conversation' in item['metadata']]
+        
+        # 다른 사용자의 대화 중 랜덤으로 하나 선택
+        other_results = index.query(
+            vector=query_vector,
+            top_k=10,
+            filter={"username": {"$ne": username}},
+            include_metadata=True
+        )
+        other_conversations = [item['metadata']['conversation'] for item in other_results['matches'] if 'metadata' in item and 'conversation' in item['metadata']]
+        random_other_conversation = random.choice(other_conversations) if other_conversations else None
         
         prompt = f"""You are an empathetic life coach using the TEACHer model. 
         Current stage: {current_stage}
         Question count: {question_count}
         Previous conversation: {conversation[-5:] if len(conversation) > 5 else conversation}
-        Similar past conversations: {similar_conversations}
+        Similar past conversations of the current user: {similar_user_conversations}
         
         Based on the user's responses and similar past conversations, generate a natural, empathetic response.
         Then, ask a single follow-up question related to the current stage.
@@ -99,10 +116,13 @@ def generate_coach_response(conversation, current_stage, question_count):
         {available_questions}
         
         Your response should be in Korean and should flow naturally without any labels or markers.
-        Address the user in singular form (e.g., '당신', '귀하') instead of plural ('여러분')."""
+        Address the user in singular form (e.g., '당신', '귀하') instead of plural ('여러분').
+        
+        If appropriate, you may occasionally mention: "다른 사용자 분이 '{random_other_conversation}' 라는 이야기를 하셨는데, 이에 대해 어떻게 생각하시나요?"
+        """
         
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4-0314",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip()
@@ -118,10 +138,10 @@ def save_conversation(username, conversation):
         index.upsert(
             vectors=[
                 {
-                    'id': username,
+                    'id': f"{username}_{uuid.uuid4()}",
                     'values': vector,
                     'metadata': {
-                        'conversation': conversation,
+                        'conversation': conversation_text,
                         'username': username
                     }
                 }
@@ -214,7 +234,8 @@ def process_user_input():
                 coach_response = generate_coach_response(
                     st.session_state.conversation,
                     st.session_state.current_stage,
-                    st.session_state.question_count
+                    st.session_state.question_count,
+                    st.session_state.user
                 )
                 st.session_state.conversation.append(coach_response)
 
@@ -237,7 +258,7 @@ def generate_first_question():
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            first_question = generate_coach_response([], st.session_state.current_stage, 0)
+            first_question = generate_coach_response([], st.session_state.current_stage, 0, st.session_state.user)
             if first_question:
                 st.session_state.conversation.append(first_question)
                 return
@@ -323,6 +344,8 @@ def main():
         previous_summary = summarize_previous_conversation(st.session_state.user)
         if previous_summary:
             st.info(f"이전 대화 요약: {previous_summary}")
+        else:
+            st.info("새로운 대화를 시작합니다.")
 
         st.markdown(get_chat_css(), unsafe_allow_html=True)
 
