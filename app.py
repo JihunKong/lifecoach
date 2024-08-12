@@ -118,11 +118,15 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         Your response should be in Korean and should flow naturally without any labels or markers.
         Address the user in singular form (e.g., '당신', '귀하') instead of plural ('여러분').
         
+        Make sure to ask only ONE question at a time.
+        Format the question using bold markdown: **질문**
+        
         If appropriate, you may occasionally mention: "다른 사용자 분이 '{random_other_conversation}' 라는 이야기를 하셨는데, 이에 대해 어떻게 생각하시나요?"
+        However, this should not be your main question, but part of the context or conversation.
         """
         
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4-0314",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip()
@@ -359,6 +363,15 @@ def main():
         if not st.session_state.conversation:
             generate_first_question()
 
+        st.subheader("이전 대화 기록:")
+        chat_container = st.container()
+        with chat_container:
+            for i, message in enumerate(st.session_state.conversation[:-1]):
+                if i % 2 == 0:
+                    st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
+
         st.subheader("현재 질문:")
         current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
         st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
@@ -376,15 +389,6 @@ def main():
                 st.session_state.current_stage = 'Trust'
                 st.session_state.question_count = 0
                 st.rerun()
-
-        st.subheader("이전 대화 기록:")
-        chat_container = st.container()
-        with chat_container:
-            for i, message in enumerate(st.session_state.conversation[:-1]):
-                if i % 2 == 0:
-                    st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
