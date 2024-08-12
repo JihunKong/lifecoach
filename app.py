@@ -75,14 +75,25 @@ def load_coach_data():
 
 coach_df = load_coach_data()
 
-
-
 def generate_coach_response(conversation, current_stage, question_count, username):
     try:
-        # 주제가 완성되었는지 평가하는 로직 추가
-        if question_count >= 3:  # 예를 들어 3번의 질문 이후 주제가 완성되었다고 판단
-            return "대화가 잘 진행되었습니다. 이제 이 주제를 마무리하도록 하겠습니다. 감사합니다."
+        # 대화 마무리 단계로 진입
+        if question_count >= 3 and "슬슬 코칭을 마무리하고자 합니다." not in st.session_state.conversation[-1]:
+            return "슬슬 코칭을 마무리하고자 합니다. 오늘 대화를 통해 배운 점이나 깨달은 점이 있다면 나눠주시겠어요?"
 
+        # 사용자가 배운 점을 공유한 후의 응답 생성
+        if "슬슬 코칭을 마무리하고자 합니다." in st.session_state.conversation[-1]:
+            return "귀하가 말씀하신 점에 깊이 공감합니다. 이러한 깨달음은 매우 중요합니다. 코칭을 종료해도 될까요? **예 / 아니오**"
+
+        # 사용자가 '예' 또는 '아니오'로 응답한 경우 처리
+        if "코칭을 종료해도 될까요?" in st.session_state.conversation[-1]:
+            if conversation[-1] == "예":
+                st.session_state.coaching_finished = True
+                return "대화가 잘 진행되었습니다. 이제 이 주제를 마무리하도록 하겠습니다. 감사합니다."
+            elif conversation[-1] == "아니오":
+                return "더 대화를 나누고 싶으신 주제가 있나요? 없다면 이 주제를 조금 더 깊이 다뤄보겠습니다."
+
+        # 기존 응답 생성 로직
         stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
         available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
         available_questions = [q for q in available_questions if pd.notnull(q)]
@@ -127,26 +138,6 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         st.error(f"GPT API 호출 중 오류 발생: {str(e)}")
         return "죄송합니다. 응답을 생성하는 데 문제가 발생했습니다. 다시 시도해 주세요."
 
-# 대화 저장 함수
-def save_conversation(username, conversation):
-    conversation_text = " ".join(conversation)
-    vector = create_vector(conversation_text)
-    try:
-        index.upsert(
-            vectors=[
-                {
-                    'id': f"{username}_{uuid.uuid4()}",
-                    'values': vector,
-                    'metadata': {
-                        'conversation': conversation_text,
-                        'username': username
-                    }
-                }
-            ]
-        )
-    except Exception as e:
-        st.error(f"대화 저장 실패: {str(e)}")
-
 # CSS for chat layout
 def get_chat_css():
     return """
@@ -190,7 +181,7 @@ def get_chat_css():
     </style>
     """
 
-# 사용자 입력 처리 함수
+# 사용자 입력 처리 함수 수정
 def process_user_input():
     user_input = st.session_state.user_input
     if user_input:
@@ -207,14 +198,36 @@ def process_user_input():
 
             # 질문 횟수가 기준을 넘어가면 대화를 종료
             st.session_state.question_count += 1
-            if "이 주제를 마무리하도록 하겠습니다." in coach_response:
-                st.session_state.coaching_finished = True
 
             save_conversation(st.session_state.user, st.session_state.conversation)
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
         finally:
             st.session_state.user_input = ""  # 입력창 비우기
+
+        # 종료 여부를 선택한 경우 처리
+        if st.session_state.coaching_finished:
+            st.success("코칭이 종료되었습니다. 대화를 초기화하고 새로운 세션을 시작하시겠습니까?")
+            if st.button("새 세션 시작"):
+                st.session_state.conversation = []
+                st.session_state.current_stage = 'Trust'
+                st.session_state.question_count = 0
+                st.session_state.coaching_finished = False
+                st.rerun()
+        else:
+            # "예" 또는 "아니오" 응답 후의 대화 진행
+            if "코칭을 종료해도 될까요?" in st.session_state.conversation[-2]:
+                if user_input == "아니오":
+                    st.text_input("더 대화를 나누고 싶으신 주제가 있나요?", key="new_topic", on_change=process_user_input)
+                elif user_input == "예":
+                    st.session_state.coaching_finished = True
+                    st.success("코칭이 종료되었습니다. 대화를 초기화하고 새로운 세션을 시작하시겠습니까?")
+                    if st.button("새 세션 시작"):
+                        st.session_state.conversation = []
+                        st.session_state.current_stage = 'Trust'
+                        st.session_state.question_count = 0
+                        st.session_state.coaching_finished = False
+                        st.rerun()
 
 # 첫 질문 생성 함수
 def generate_first_question():
