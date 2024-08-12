@@ -90,7 +90,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         Your response should be in Korean and should flow naturally without any labels or markers."""
         
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip() 
@@ -153,6 +153,34 @@ def get_chat_css():
 # 첫 질문 생성 함수
 def generate_first_question():
     st.session_state.conversation.append("안녕하세요, 당신을 위한 라이프 코치입니다. 오늘 기분은 어떠세요?")
+
+# 사용자 입력 처리 함수
+def process_user_input():
+    user_input = st.session_state.user_input
+    if user_input:
+        st.session_state.conversation.append(user_input)
+        try:
+            with st.spinner("코치가 응답을 생성하고 있습니다..."):
+                coach_response = generate_coach_response(
+                    st.session_state.conversation,
+                    st.session_state.current_stage,
+                    st.session_state.question_count
+                )
+                st.session_state.conversation.append(coach_response)
+
+            st.session_state.question_count += 1
+            if st.session_state.question_count >= 3:
+                stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
+                current_stage_index = stages.index(st.session_state.current_stage)
+                if current_stage_index < len(stages) - 1:
+                    st.session_state.current_stage = stages[current_stage_index + 1]
+                    st.session_state.question_count = 0
+
+            save_conversation(st.session_state.session_id, st.session_state.conversation)
+        except Exception as e:
+            st.error(f"응답 생성 중 오류 발생: {str(e)}")
+        finally:
+            st.session_state.user_input = ""  # 입력창 비우기
 
 # 메인 앱 로직
 def main():
