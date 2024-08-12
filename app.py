@@ -75,8 +75,14 @@ def load_coach_data():
 
 coach_df = load_coach_data()
 
+
+
 def generate_coach_response(conversation, current_stage, question_count, username):
     try:
+        # 주제가 완성되었는지 평가하는 로직 추가
+        if question_count >= 3:  # 예를 들어 3번의 질문 이후 주제가 완성되었다고 판단
+            return "대화가 잘 진행되었습니다. 이제 이 주제를 마무리하도록 하겠습니다. 감사합니다."
+
         stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
         available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
         available_questions = [q for q in available_questions if pd.notnull(q)]
@@ -199,15 +205,10 @@ def process_user_input():
                 )
                 st.session_state.conversation.append(coach_response)
 
+            # 질문 횟수가 기준을 넘어가면 대화를 종료
             st.session_state.question_count += 1
-            if st.session_state.question_count >= 5:
-                stages = ['Trust', 'Explore', 'Aspire', 'Create', 'Harvest', 'Empower&Reflect']
-                current_stage_index = stages.index(st.session_state.current_stage)
-                if current_stage_index < len(stages) - 1:
-                    st.session_state.current_stage = stages[current_stage_index + 1]
-                    st.session_state.question_count = 0
-                else:
-                    st.session_state.coaching_finished = True
+            if "이 주제를 마무리하도록 하겠습니다." in coach_response:
+                st.session_state.coaching_finished = True
 
             save_conversation(st.session_state.user, st.session_state.conversation)
         except Exception as e:
