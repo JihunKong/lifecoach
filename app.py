@@ -126,7 +126,7 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         """
         
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4-0314",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip()
@@ -154,7 +154,7 @@ def save_conversation(username, conversation):
     except Exception as e:
         st.error(f"대화 저장 실패: {str(e)}")
 
-# 이전 대화 요약 함수
+# 이전 대화 요약 함수 (숨김 처리)
 def summarize_previous_conversation(username):
     try:
         results = index.query(
@@ -175,15 +175,9 @@ def summarize_previous_conversation(username):
                     messages=[{"role": "system", "content": prompt}]
                 )
                 return completion.choices[0].message.content.strip()
-            else:
-                st.warning("이전 대화 메타데이터를 찾을 수 없습니다.")
-                return None
-        else:
-            st.info("이전 대화 기록이 없습니다.")
-            return None
     except Exception as e:
         st.error(f"이전 대화 요약 중 오류 발생: {str(e)}")
-        return None
+    return None
 
 # CSS for chat layout
 def get_chat_css():
@@ -344,13 +338,6 @@ def main():
         if st.button("로그아웃"):
             logout_user()
 
-        # 이전 대화 요약 표시
-        previous_summary = summarize_previous_conversation(st.session_state.user)
-        if previous_summary:
-            st.info(f"이전 대화 요약: {previous_summary}")
-        else:
-            st.info("새로운 대화를 시작합니다.")
-
         st.markdown(get_chat_css(), unsafe_allow_html=True)
 
         if 'conversation' not in st.session_state:
@@ -362,15 +349,6 @@ def main():
 
         if not st.session_state.conversation:
             generate_first_question()
-
-        st.subheader("이전 대화 기록:")
-        chat_container = st.container()
-        with chat_container:
-            for i, message in enumerate(st.session_state.conversation[:-1]):
-                if i % 2 == 0:
-                    st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
 
         st.subheader("현재 질문:")
         current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
@@ -389,6 +367,16 @@ def main():
                 st.session_state.current_stage = 'Trust'
                 st.session_state.question_count = 0
                 st.rerun()
+
+        # 이전 대화 기록을 현재 질문과 채팅창 아래로 이동
+        st.subheader("이전 대화 기록:")
+        chat_container = st.container()
+        with chat_container:
+            for i, message in enumerate(st.session_state.conversation[:-1]):
+                if i % 2 == 0:
+                    st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
