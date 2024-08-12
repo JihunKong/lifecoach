@@ -102,7 +102,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         Address the user in singular form (e.g., '당신', '귀하') instead of plural ('여러분')."""
         
         completion = client.chat.completions.create(
-            model="gpt-4-0314",
+            model="gpt-4o-mini",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip()
