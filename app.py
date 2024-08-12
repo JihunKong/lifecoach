@@ -237,7 +237,7 @@ def process_user_input():
                 st.session_state.question_count = 0
                 st.session_state.coaching_finished = False
                 generate_first_question()  # 첫 대화 생성
-                st.experimental_rerun()
+                st.rerun()
 
 # 코칭 종료 처리 함수
 def process_end_coaching():
@@ -276,7 +276,7 @@ def login_user():
             st.session_state.user = username
             st.session_state.logged_in = True
             st.success("로그인 성공!")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("잘못된 사용자 이름 또는 비밀번호입니다.")
 
@@ -298,7 +298,7 @@ def logout_user():
     st.session_state.question_count = 0
     st.session_state.coaching_finished = False
     st.info("로그아웃되었습니다.")
-    st.experimental_rerun()
+    st.rerun()
 
 # 메인 앱 로직
 def main():
@@ -343,13 +343,13 @@ def main():
                 st.session_state.question_count = 0
                 st.session_state.coaching_finished = False
                 generate_first_question()  # 첫 대화 생성
-                st.experimental_rerun()
+                st.rerun()
 
         # 대화 초기화 버튼 추가
         if st.button("대화 초기화"):
             st.session_state.conversation = []
             generate_first_question()  # 첫 대화 생성
-            st.experimental_rerun()
+            st.rerun()
 
         # 이전 대화 기록을 현재 질문과 채팅창 아래로 이동
         st.subheader("이전 대화 기록:")
