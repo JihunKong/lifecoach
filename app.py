@@ -107,6 +107,49 @@ def save_conversation(session_id, conversation):
     except Exception as e:
         st.error(f"대화 저장 실패: {str(e)}")
 
+# CSS for chat layout
+def get_chat_css():
+    return """
+    <style>
+    body {
+        background-color: #f5f5f5;
+        color: #333;
+    }
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+    }
+    .message {
+        border-radius: 10px;
+        padding: 10px 15px;
+        margin: 5px 0;
+        max-width: 75%;
+        font-size: 1em;
+    }
+    .user-message {
+        align-self: flex-end;
+        background-color: #e0f7fa;
+        color: #006064;
+    }
+    .coach-message {
+        align-self: flex-start;
+        background-color: #ffeb3b;
+        color: #f57f17;
+    }
+    .current-message {
+        border: 2px solid #4caf50;
+        background-color: #ffffff;
+        color: #212121;
+        font-size: 1.2em;
+        font-weight: bold;
+    }
+    .input-container {
+        margin-top: 20px;
+    }
+    </style>
+    """
+
 # 첫 질문 생성 함수
 def generate_first_question():
     st.session_state.conversation.append("안녕하세요, 당신을 위한 라이프 코치입니다. 오늘 기분은 어떠세요?")
