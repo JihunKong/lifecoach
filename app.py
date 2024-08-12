@@ -321,61 +321,49 @@ def logout_user():
     st.info("로그아웃되었습니다.")
     st.rerun()
 
-# 메인 앱 로직
 def main():
     st.title("AI 코칭 시스템")
 
-    if 'logged_in' not in st.session_state:
-        st.session_state.logged_in = False
+    # Initialize session state variables
+    if 'session_id' not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+    if 'current_stage' not in st.session_state:
+        st.session_state.current_stage = 'Trust'
+    if 'question_count' not in st.session_state:
+        st.session_state.question_count = 0
+    if 'conversation' not in st.session_state:
+        st.session_state.conversation = []
+        generate_first_question()  # 첫 질문을 자동으로 생성
 
-    if not st.session_state.logged_in:
-        login_user()
-        st.markdown("---")
-        signup_user()
-    else:
-        st.write(f"안녕하세요, {st.session_state.user}님!")
-        if st.button("로그아웃"):
-            logout_user()
+    st.markdown(get_chat_css(), unsafe_allow_html=True)
 
-        st.markdown(get_chat_css(), unsafe_allow_html=True)
+    st.subheader("현재 질문:")
+    current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
+    st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
 
-        if 'conversation' not in st.session_state:
+    # 입력 처리와 상태 초기화를 위해 on_change 사용
+    st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
+
+    # 초기화 버튼을 우측에 배치
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        st.write("")  # 왼쪽 공간 확보용
+    with col2:
+        if st.button("대화 초기화"):
             st.session_state.conversation = []
-        if 'current_stage' not in st.session_state:
             st.session_state.current_stage = 'Trust'
-        if 'question_count' not in st.session_state:
             st.session_state.question_count = 0
-        if 'coaching_finished' not in st.session_state:
-            st.session_state.coaching_finished = False
+            generate_first_question()  # 초기화 후 첫 질문을 생성
+            st.experimental_rerun()
 
-        if not st.session_state.conversation:
-            generate_first_question()
-
-        st.subheader("현재 질문:")
-        current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
-        st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
-
-        if not st.session_state.coaching_finished:
-            # 입력 처리와 상태 초기화를 위해 on_change 사용
-            st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
-        else:
-            st.success("코칭이 종료되었습니다. 대화를 초기화하고 새로운 세션을 시작하시겠습니까?")
-            if st.button("새 세션 시작"):
-                st.session_state.conversation = []
-                st.session_state.current_stage = 'Trust'
-                st.session_state.question_count = 0
-                st.session_state.coaching_finished = False
-                st.rerun()
-
-        # 이전 대화 기록을 현재 질문과 채팅창 아래로 이동
-        st.subheader("이전 대화 기록:")
-        chat_container = st.container()
-        with chat_container:
-            for i, message in enumerate(st.session_state.conversation[:-1]):
-                if i % 2 == 0:
-                    st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
+    st.subheader("이전 대화 기록:")
+    chat_container = st.container()
+    with chat_container:
+        for i, message in enumerate(st.session_state.conversation[:-1]):
+            if i % 2 == 0:
+                st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
