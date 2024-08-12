@@ -77,20 +77,23 @@ coach_df = load_coach_data()
 
 def generate_coach_response(conversation, current_stage, question_count, username):
     try:
+        # 단계별 최소 질문 수 설정
+        min_questions_per_stage = 3
+        
         # 대화 마무리 단계로 진입
-        if question_count >= 3 and "슬슬 코칭을 마무리하고자 합니다." not in st.session_state.conversation[-1]:
+        if question_count >= min_questions_per_stage and "슬슬 코칭을 마무리하고자 합니다." not in conversation[-1]:
             return "슬슬 코칭을 마무리하고자 합니다. 오늘 대화를 통해 배운 점이나 깨달은 점이 있다면 나눠주시겠어요?"
 
         # 사용자가 배운 점을 공유한 후의 응답 생성
-        if "슬슬 코칭을 마무리하고자 합니다." in st.session_state.conversation[-1]:
+        if "슬슬 코칭을 마무리하고자 합니다." in conversation[-1]:
             return "귀하가 말씀하신 점에 깊이 공감합니다. 이러한 깨달음은 매우 중요합니다. 코칭을 종료해도 될까요? **예 / 아니오**"
 
         # 사용자가 '예' 또는 '아니오'로 응답한 경우 처리
-        if "코칭을 종료해도 될까요?" in st.session_state.conversation[-1]:
-            if conversation[-1] == "예":
+        if "코칭을 종료해도 될까요?" in conversation[-1]:
+            if conversation[-1].lower() == "예":
                 st.session_state.coaching_finished = True
                 return "대화가 잘 진행되었습니다. 이제 이 주제를 마무리하도록 하겠습니다. 감사합니다."
-            elif conversation[-1] == "아니오":
+            elif conversation[-1].lower() == "아니오":
                 return "더 대화를 나누고 싶으신 주제가 있나요? 없다면 이 주제를 조금 더 깊이 다뤄보겠습니다."
 
         # 기존 응답 생성 로직
@@ -121,14 +124,14 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         2. 사용자를 단수 형태(예: '당신', '귀하')로 지칭하세요.
         3. 반드시 하나의 질문만 생성하세요. 이 질문은 현재 단계와 관련되어야 하며, 이전 질문들과 중복되지 않아야 합니다. 질문 시에는 대화의 흐름을 자연스럽게 유지하고, 제공된 파일을 창의적으로 응용하여 적절하게 제시합니다.
         4. 현재 단계의 목표 달성도를 평가하고, 필요시 다음 단계로의 전환을 고려하세요.
+        5. 각 단계에서 최소 {min_questions_per_stage}개의 질문을 하기 전에는 대화를 마무리하지 마세요.
 
-        
         응답 형식:
         [코치의 응답]
         """
         
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4-0314",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip()
@@ -214,7 +217,7 @@ def process_user_input():
                 )
                 st.session_state.conversation.append(coach_response)
 
-            # 질문 횟수가 기준을 넘어가면 대화를 종료
+            # 질문 횟수 증가
             st.session_state.question_count += 1
 
             save_conversation(st.session_state.user, st.session_state.conversation)
@@ -224,28 +227,23 @@ def process_user_input():
             st.session_state.user_input = ""  # 입력창 비우기
 
         # 종료 여부를 선택한 경우 처리
-        if st.session_state.coaching_finished:
+        if "코칭을 종료해도 될까요?" in st.session_state.conversation[-1]:
+            st.radio("코칭을 종료하시겠습니까?", ["예", "아니오"], key="end_coaching", on_change=process_end_coaching)
+        elif st.session_state.coaching_finished:
             st.success("코칭이 종료되었습니다. 대화를 초기화하고 새로운 세션을 시작하시겠습니까?")
             if st.button("새 세션 시작"):
                 st.session_state.conversation = []
                 st.session_state.current_stage = 'Trust'
                 st.session_state.question_count = 0
                 st.session_state.coaching_finished = False
-                st.rerun()
-        else:
-            # "예" 또는 "아니오" 응답 후의 대화 진행
-            if "코칭을 종료해도 될까요?" in st.session_state.conversation[-2]:
-                if user_input == "아니오":
-                    st.text_input("더 대화를 나누고 싶으신 주제가 있나요?", key="new_topic", on_change=process_user_input)
-                elif user_input == "예":
-                    st.session_state.coaching_finished = True
-                    st.success("코칭이 종료되었습니다. 대화를 초기화하고 새로운 세션을 시작하시겠습니까?")
-                    if st.button("새 세션 시작"):
-                        st.session_state.conversation = []
-                        st.session_state.current_stage = 'Trust'
-                        st.session_state.question_count = 0
-                        st.session_state.coaching_finished = False
-                        st.rerun()
+                generate_first_question()  # 첫 대화 생성
+                st.experimental_rerun()
+
+# 코칭 종료 처리 함수
+def process_end_coaching():
+    end_choice = st.session_state.end_coaching
+    st.session_state.conversation.append(end_choice)
+    process_user_input()
 
 # 첫 질문 생성 함수
 def generate_first_question():
@@ -278,7 +276,7 @@ def login_user():
             st.session_state.user = username
             st.session_state.logged_in = True
             st.success("로그인 성공!")
-            st.rerun()
+            st.experimental_rerun()
         else:
             st.error("잘못된 사용자 이름 또는 비밀번호입니다.")
 
@@ -300,7 +298,7 @@ def logout_user():
     st.session_state.question_count = 0
     st.session_state.coaching_finished = False
     st.info("로그아웃되었습니다.")
-    st.rerun()
+    st.experimental_rerun()
 
 # 메인 앱 로직
 def main():
@@ -308,7 +306,6 @@ def main():
 
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
-
     if not st.session_state.logged_in:
         login_user()
         st.markdown("---")
@@ -346,13 +343,13 @@ def main():
                 st.session_state.question_count = 0
                 st.session_state.coaching_finished = False
                 generate_first_question()  # 첫 대화 생성
-                st.rerun()
+                st.experimental_rerun()
 
         # 대화 초기화 버튼 추가
         if st.button("대화 초기화"):
             st.session_state.conversation = []
             generate_first_question()  # 첫 대화 생성
-            st.rerun()
+            st.experimental_rerun()
 
         # 이전 대화 기록을 현재 질문과 채팅창 아래로 이동
         st.subheader("이전 대화 기록:")
@@ -365,4 +362,4 @@ def main():
                     st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()
+    main()  
