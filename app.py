@@ -75,26 +75,30 @@ def load_coach_data():
 
 coach_df = load_coach_data()
 
+# TEACHer 모델의 단계 정의
+TEACHER_STAGES = ['Trust', 'Explore', 'Action', 'Change', 'Habit', 'Evaluate', 'Reinforce']
+
 def generate_coach_response(conversation, current_stage, question_count, username):
     try:
-        # 단계별 최소 질문 수 설정
+        # 각 단계별 최소 질문 수 설정
         min_questions_per_stage = 3
         
-        # 대화 마무리 단계로 진입
-        if question_count >= min_questions_per_stage and "슬슬 코칭을 마무리하고자 합니다." not in conversation[-1]:
-            return "슬슬 코칭을 마무리하고자 합니다. 오늘 대화를 통해 배운 점이나 깨달은 점이 있다면 나눠주시겠어요?"
+        # 현재 단계의 인덱스 찾기
+        current_stage_index = TEACHER_STAGES.index(current_stage)
+        
+        # 현재 단계에서 질문 수가 최소 질문 수를 초과하고, 마지막 단계가 아닌 경우
+        if question_count >= min_questions_per_stage and current_stage_index < len(TEACHER_STAGES) - 1:
+            next_stage = TEACHER_STAGES[current_stage_index + 1]
+            return f"이제 {current_stage} 단계를 마치고 {next_stage} 단계로 넘어가겠습니다. {next_stage} 단계에서는 어떤 점을 중점적으로 다루고 싶으신가요?"
 
-        # 사용자가 배운 점을 공유한 후의 응답 생성
-        if "슬슬 코칭을 마무리하고자 합니다." in conversation[-1]:
-            return "귀하가 말씀하신 점에 깊이 공감합니다. 이러한 깨달음은 매우 중요합니다. 코칭을 종료해도 될까요? **예 / 아니오**"
+        # 마지막 단계이고 최소 질문 수를 충족한 경우
+        if current_stage_index == len(TEACHER_STAGES) - 1 and question_count >= min_questions_per_stage:
+            return "모든 단계를 완료했습니다. 전체 코칭 과정을 통해 어떤 점을 깨닫거나 배우셨나요? 마지막으로 느낀 점을 공유해 주시겠어요?"
 
-        # 사용자가 '예' 또는 '아니오'로 응답한 경우 처리
-        if "코칭을 종료해도 될까요?" in conversation[-1]:
-            if conversation[-1].lower() == "예":
-                st.session_state.coaching_finished = True
-                return "대화가 잘 진행되었습니다. 이제 이 주제를 마무리하도록 하겠습니다. 감사합니다."
-            elif conversation[-1].lower() == "아니오":
-                return "더 대화를 나누고 싶으신 주제가 있나요? 없다면 이 주제를 조금 더 깊이 다뤄보겠습니다."
+        # 마지막 질문에 대한 사용자의 응답 후 코칭 종료
+        if "모든 단계를 완료했습니다." in conversation[-2]:
+            st.session_state.coaching_finished = True
+            return "코칭 세션이 끝났습니다. 귀하의 성장과 발전을 응원합니다. 추가 코칭이 필요하시면 언제든 새로운 세션을 시작해 주세요."
 
         # 기존 응답 생성 로직
         stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
@@ -124,7 +128,7 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         2. 사용자를 단수 형태(예: '당신', '귀하')로 지칭하세요.
         3. 반드시 하나의 질문만 생성하세요. 이 질문은 현재 단계와 관련되어야 하며, 이전 질문들과 중복되지 않아야 합니다. 질문 시에는 대화의 흐름을 자연스럽게 유지하고, 제공된 파일을 창의적으로 응용하여 적절하게 제시합니다.
         4. 현재 단계의 목표 달성도를 평가하고, 필요시 다음 단계로의 전환을 고려하세요.
-        5. 각 단계에서 최소 {min_questions_per_stage}개의 질문을 하기 전에는 대화를 마무리하지 마세요.
+        5. 각 단계에서 최소 {min_questions_per_stage}개의 질문을 하기 전에는 다음 단계로 넘어가지 마세요.
 
         응답 형식:
         [코치의 응답]
@@ -220,16 +224,19 @@ def process_user_input():
             # 질문 횟수 증가
             st.session_state.question_count += 1
 
+            # 다음 단계로 넘어가는 경우
+            if "단계로 넘어가겠습니다" in coach_response:
+                next_stage = coach_response.split()[2]  # "Trust 단계로 넘어가겠습니다." 에서 "Trust" 추출
+                st.session_state.current_stage = next_stage
+                st.session_state.question_count = 0
+
             save_conversation(st.session_state.user, st.session_state.conversation)
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
         finally:
             st.session_state.user_input = ""  # 입력창 비우기
 
-        # 종료 여부를 선택한 경우 처리
-        if "코칭을 종료해도 될까요?" in st.session_state.conversation[-1]:
-            st.radio("코칭을 종료하시겠습니까?", ["예", "아니오"], key="end_coaching", on_change=process_end_coaching)
-        elif st.session_state.coaching_finished:
+        if st.session_state.coaching_finished:
             st.success("코칭이 종료되었습니다. 대화를 초기화하고 새로운 세션을 시작하시겠습니까?")
             if st.button("새 세션 시작"):
                 st.session_state.conversation = []
@@ -238,12 +245,6 @@ def process_user_input():
                 st.session_state.coaching_finished = False
                 generate_first_question()  # 첫 대화 생성
                 st.rerun()
-
-# 코칭 종료 처리 함수
-def process_end_coaching():
-    end_choice = st.session_state.end_coaching
-    st.session_state.conversation.append(end_choice)
-    process_user_input()
 
 # 첫 질문 생성 함수
 def generate_first_question():
@@ -350,8 +351,15 @@ def main():
         # 대화 초기화 버튼 추가
         if st.button("대화 초기화"):
             st.session_state.conversation = []
+            st.session_state.current_stage = 'Trust'
+            st.session_state.question_count = 0
+            st.session_state.coaching_finished = False
             generate_first_question()  # 첫 대화 생성
             st.rerun()
+
+        # 현재 단계 표시
+        st.sidebar.subheader("현재 단계")
+        st.sidebar.write(st.session_state.current_stage)
 
         # 이전 대화 기록을 현재 질문과 채팅창 아래로 이동
         st.subheader("이전 대화 기록:")
