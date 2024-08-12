@@ -64,7 +64,7 @@ def load_coach_data():
 coach_df = load_coach_data()
 
 # GPT를 사용한 코칭 대화 생성 함수
-def generate_coach_response(conversation, current_stage, question_count):
+def generate_coach_response(conversation, current_stage, question_count, session_id):
     try:
         stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
         available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
@@ -74,7 +74,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         query_vector = create_vector(recent_conversation)
         
         results = index.query(vector=query_vector, top_k=3, include_metadata=True)
-        similar_conversations = [item['metadata']['conversation'] for item in results['matches']]
+        similar_conversations = [item['metadata']['conversation'] for item in results['matches'] if item['metadata']['session_id'] == session_id]
         
         prompt = f"""You are an empathetic life coach using the TEACHer model. 
         Current stage: {current_stage}
@@ -87,13 +87,14 @@ def generate_coach_response(conversation, current_stage, question_count):
         Choose from or create a question similar to these for the current stage:
         {available_questions}
         
-        Your response should be in Korean and should flow naturally without any labels or markers."""
+        Your response should be in Korean and should flow naturally without any labels or markers.
+        Address the user in singular form (e.g., '당신', '귀하') instead of plural ('여러분')."""
         
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4-0314",
             messages=[{"role": "system", "content": prompt}]
         )
-        return completion.choices[0].message.content.strip() 
+        return completion.choices[0].message.content.strip()
     except Exception as e:
         st.error(f"GPT API 호출 중 오류 발생: {str(e)}")
         return "죄송합니다. 응답을 생성하는 데 문제가 발생했습니다. 다시 시도해 주세요."
@@ -103,9 +104,28 @@ def save_conversation(session_id, conversation):
     conversation_text = " ".join(conversation)
     vector = create_vector(conversation_text)
     try:
-        index.upsert(vectors=[(session_id, vector, {"conversation": conversation})])
+        index.upsert(vectors=[(session_id, vector, {"conversation": conversation, "session_id": session_id})])
     except Exception as e:
         st.error(f"대화 저장 실패: {str(e)}")
+
+# 이전 대화 요약 함수
+def summarize_previous_conversation(session_id):
+    try:
+        results = index.query(vector=[0]*1536, top_k=1, filter={"session_id": session_id})
+        if results['matches']:
+            previous_conversation = results['matches'][0]['metadata']['conversation']
+            prompt = f"""이전 대화를 요약해주세요. 핵심 내용만 간략하게 정리해 주세요.
+            이전 대화: {previous_conversation}"""
+            
+            completion = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "system", "content": prompt}]
+            )
+            return completion.choices[0].message.content.strip()
+        return None
+    except Exception as e:
+        st.error(f"이전 대화 요약 중 오류 발생: {str(e)}")
+        return None
 
 # CSS for chat layout
 def get_chat_css():
@@ -160,7 +180,8 @@ def process_user_input():
                 coach_response = generate_coach_response(
                     st.session_state.conversation,
                     st.session_state.current_stage,
-                    st.session_state.question_count
+                    st.session_state.question_count,
+                    st.session_state.session_id
                 )
                 st.session_state.conversation.append(coach_response)
 
@@ -181,7 +202,7 @@ def process_user_input():
 # 첫 질문 생성 함수
 def generate_first_question():
     try:
-        first_question = generate_coach_response([], st.session_state.current_stage, 0)
+        first_question = generate_coach_response([], st.session_state.current_stage, 0, st.session_state.session_id)
         st.session_state.conversation.append(first_question)
         st.rerun()
     except Exception as e:
@@ -202,6 +223,11 @@ def main():
         st.session_state.conversation = []
     if 'user_input' not in st.session_state:
         st.session_state.user_input = ""
+
+    # 이전 대화 요약 표시
+    previous_summary = summarize_previous_conversation(st.session_state.session_id)
+    if previous_summary:
+        st.info(f"이전 대화 요약: {previous_summary}")
 
     st.markdown(get_chat_css(), unsafe_allow_html=True)
 
