@@ -5,9 +5,19 @@ import openai
 from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
 import time
+import sqlite3
+import hashlib
 
 # Streamlit 페이지 설정
 st.set_page_config(page_title="AI 코칭 시스템", layout="wide")
+
+# 데이터베이스 연결
+conn = sqlite3.connect('users.db')
+c = conn.cursor()
+
+# 사용자 테이블 생성
+c.execute('''CREATE TABLE IF NOT EXISTS users
+             (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT)''')
 
 # OpenAI 클라이언트 초기화
 @st.cache_resource
@@ -75,7 +85,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         query_vector = create_vector(recent_conversation)
         
         results = index.query(vector=query_vector, top_k=3, include_metadata=True)
-        similar_conversations = [item['metadata']['conversation'] for item in results['matches']]
+        similar_conversations = [item['metadata']['conversation'] for item in results['matches'] if 'metadata' in item and 'conversation' in item['metadata']]
         
         prompt = f"""You are an empathetic life coach using the TEACHer model. 
         Current stage: {current_stage}
@@ -92,7 +102,7 @@ def generate_coach_response(conversation, current_stage, question_count):
         Address the user in singular form (e.g., '당신', '귀하') instead of plural ('여러분')."""
         
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4-0314",
             messages=[{"role": "system", "content": prompt}]
         )
         return completion.choices[0].message.content.strip()
@@ -101,29 +111,52 @@ def generate_coach_response(conversation, current_stage, question_count):
         return "죄송합니다. 응답을 생성하는 데 문제가 발생했습니다. 다시 시도해 주세요."
 
 # 대화 저장 함수
-def save_conversation(session_id, conversation):
+def save_conversation(username, conversation):
     conversation_text = " ".join(conversation)
     vector = create_vector(conversation_text)
     try:
-        index.upsert(vectors=[(session_id, vector, {"conversation": conversation, "session_id": session_id})])
+        index.upsert(
+            vectors=[
+                {
+                    'id': username,
+                    'values': vector,
+                    'metadata': {
+                        'conversation': conversation,
+                        'username': username
+                    }
+                }
+            ]
+        )
     except Exception as e:
         st.error(f"대화 저장 실패: {str(e)}")
 
 # 이전 대화 요약 함수
-def summarize_previous_conversation(session_id):
+def summarize_previous_conversation(username):
     try:
-        results = index.query(vector=[0]*1536, top_k=1, filter={"session_id": session_id})
+        results = index.query(
+            vector=[0]*1536,  # 더미 벡터, 실제로는 사용되지 않음
+            top_k=1,
+            filter={"username": username},
+            include_metadata=True
+        )
         if results['matches']:
-            previous_conversation = results['matches'][0]['metadata']['conversation']
-            prompt = f"""이전 대화를 요약해주세요. 핵심 내용만 간략하게 정리해 주세요.
-            이전 대화: {previous_conversation}"""
-            
-            completion = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "system", "content": prompt}]
-            )
-            return completion.choices[0].message.content.strip()
-        return None
+            match = results['matches'][0]
+            if 'metadata' in match and 'conversation' in match['metadata']:
+                previous_conversation = match['metadata']['conversation']
+                prompt = f"""이전 대화를 요약해주세요. 핵심 내용만 간략하게 정리해 주세요.
+                이전 대화: {previous_conversation}"""
+                
+                completion = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "system", "content": prompt}]
+                )
+                return completion.choices[0].message.content.strip()
+            else:
+                st.warning("이전 대화 메타데이터를 찾을 수 없습니다.")
+                return None
+        else:
+            st.info("이전 대화 기록이 없습니다.")
+            return None
     except Exception as e:
         st.error(f"이전 대화 요약 중 오류 발생: {str(e)}")
         return None
@@ -193,7 +226,7 @@ def process_user_input():
                     st.session_state.current_stage = stages[current_stage_index + 1]
                     st.session_state.question_count = 0
 
-            save_conversation(st.session_state.session_id, st.session_state.conversation)
+            save_conversation(st.session_state.user, st.session_state.conversation)
         except Exception as e:
             st.error(f"응답 생성 중 오류 발생: {str(e)}")
         finally:
@@ -220,58 +253,115 @@ def generate_first_question():
 
     st.rerun()
 
+# 사용자 인증 관련 함수
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def create_user(username, password):
+    hashed_password = hash_password(password)
+    try:
+        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+def verify_user(username, password):
+    hashed_password = hash_password(password)
+    c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, hashed_password))
+    return c.fetchone() is not None
+
+def login_user():
+    st.subheader("로그인")
+    username = st.text_input("사용자 이름")
+    password = st.text_input("비밀번호", type="password")
+    if st.button("로그인"):
+        if verify_user(username, password):
+            st.session_state.user = username
+            st.session_state.logged_in = True
+            st.success("로그인 성공!")
+            st.rerun()
+        else:
+            st.error("잘못된 사용자 이름 또는 비밀번호입니다.")
+
+def signup_user():
+    st.subheader("회원가입")
+    new_username = st.text_input("새 사용자 이름")
+    new_password = st.text_input("새 비밀번호", type="password")
+    if st.button("가입하기"):
+        if create_user(new_username, new_password):
+            st.success("계정이 생성되었습니다. 이제 로그인할 수 있습니다.")
+        else:
+            st.error("이미 존재하는 사용자 이름입니다.")
+
+def logout_user():
+    st.session_state.user = None
+    st.session_state.logged_in = False
+    st.session_state.conversation = []
+    st.session_state.current_stage = 'Trust'
+    st.session_state.question_count = 0
+    st.info("로그아웃되었습니다.")
+    st.rerun()
+
 # 메인 앱 로직
 def main():
     st.title("AI 코칭 시스템")
 
-    # Initialize session state variables
-    if 'session_id' not in st.session_state:
-        st.session_state.session_id = str(uuid.uuid4())
-    if 'current_stage' not in st.session_state:
-        st.session_state.current_stage = 'Trust'
-    if 'question_count' not in st.session_state:
-        st.session_state.question_count = 0
-    if 'conversation' not in st.session_state:
-        st.session_state.conversation = []
-    if 'user_input' not in st.session_state:
-        st.session_state.user_input = ""
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
 
-    # 이전 대화 요약 표시
-    previous_summary = summarize_previous_conversation(st.session_state.session_id)
-    if previous_summary:
-        st.info(f"이전 대화 요약: {previous_summary}")
+    if not st.session_state.logged_in:
+        login_user()
+        st.markdown("---")
+        signup_user()
+    else:
+        st.write(f"안녕하세요, {st.session_state.user}님!")
+        if st.button("로그아웃"):
+            logout_user()
 
-    st.markdown(get_chat_css(), unsafe_allow_html=True)
+        # 이전 대화 요약 표시
+        previous_summary = summarize_previous_conversation(st.session_state.user)
+        if previous_summary:
+            st.info(f"이전 대화 요약: {previous_summary}")
 
-    if not st.session_state.conversation:
-        generate_first_question()
+        st.markdown(get_chat_css(), unsafe_allow_html=True)
 
-    st.subheader("현재 질문:")
-    current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
-    st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
-
-    # 입력 처리와 상태 초기화를 위해 on_change 사용
-    st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
-
-    # 초기화 버튼을 우측에 배치
-    col1, col2 = st.columns([0.8, 0.2])
-    with col1:
-        st.write("")  # 왼쪽 공간 확보용
-    with col2:
-        if st.button("대화 초기화"):
+        if 'conversation' not in st.session_state:
             st.session_state.conversation = []
+        if 'current_stage' not in st.session_state:
             st.session_state.current_stage = 'Trust'
+        if 'question_count' not in st.session_state:
             st.session_state.question_count = 0
-            st.rerun()
 
-    st.subheader("이전 대화 기록:")
-    chat_container = st.container()
-    with chat_container:
-        for i, message in enumerate(st.session_state.conversation[:-1]):
-            if i % 2 == 0:
-                st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
+        if not st.session_state.conversation:
+            generate_first_question()
+
+        st.subheader("현재 질문:")
+        current_message = st.session_state.conversation[-1] if st.session_state.conversation else ""
+        st.markdown(f'<div class="message current-message">{current_message}</div>', unsafe_allow_html=True)
+
+        # 입력 처리와 상태 초기화를 위해 on_change 사용
+        st.text_input("메시지를 입력하세요...", key="user_input", max_chars=200, on_change=process_user_input)
+
+        # 초기화 버튼을 우측에 배치
+        col1, col2 = st.columns([0.8, 0.2])
+        with col1:
+            st.write("")  # 왼쪽 공간 확보용
+        with col2:
+            if st.button("대화 초기화"):
+                st.session_state.conversation = []
+                st.session_state.current_stage = 'Trust'
+                st.session_state.question_count = 0
+                st.rerun()
+
+        st.subheader("이전 대화 기록:")
+        chat_container = st.container()
+        with chat_container:
+            for i, message in enumerate(st.session_state.conversation[:-1]):
+                if i % 2 == 0:
+                    st.markdown(f'<div class="message coach-message">{message}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
