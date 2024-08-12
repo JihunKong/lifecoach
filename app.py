@@ -111,14 +111,6 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         
         만약 현재 단계의 목표가 충분히 달성되었다고 판단되면, 사용자에게 지금까지의 대화를 요약하고 다음 단계로 넘어갈 준비가 되었는지 물어보세요.
         
-        응답 형식:
-        [코치의 응답]
-        **[후속 질문]**
-        
-        단계 달성도: [0-100 사이의 숫자]
-        다음 단계 준비 여부: [예/아니오]
-        """
-        
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "system", "content": prompt}]
