@@ -275,6 +275,8 @@ def login_user():
         if verify_user(username, password):
             st.session_state.user = username
             st.session_state.logged_in = True
+            st.session_state.conversation = []
+            generate_first_question()  # 첫 대화 생성
             st.success("로그인 성공!")
             st.rerun()
         else:
@@ -362,4 +364,4 @@ def main():
                     st.markdown(f'<div class="message user-message">{message}</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()  
+    main()
