@@ -65,7 +65,7 @@ def load_coach_data():
 coach_df = load_coach_data()
 
 # GPT를 사용한 코칭 대화 생성 함수
-def generate_coach_response(conversation, current_stage, question_count, session_id):
+def generate_coach_response(conversation, current_stage, question_count):
     try:
         stage_questions = coach_df[coach_df['step'].str.contains(current_stage, case=False, na=False)]
         available_questions = stage_questions.iloc[:, 1:].values.flatten().tolist()
@@ -75,7 +75,7 @@ def generate_coach_response(conversation, current_stage, question_count, session
         query_vector = create_vector(recent_conversation)
         
         results = index.query(vector=query_vector, top_k=3, include_metadata=True)
-        similar_conversations = [item['metadata']['conversation'] for item in results['matches'] if item['metadata']['session_id'] == session_id]
+        similar_conversations = [item['metadata']['conversation'] for item in results['matches']]
         
         prompt = f"""You are an empathetic life coach using the TEACHer model. 
         Current stage: {current_stage}
@@ -181,8 +181,7 @@ def process_user_input():
                 coach_response = generate_coach_response(
                     st.session_state.conversation,
                     st.session_state.current_stage,
-                    st.session_state.question_count,
-                    st.session_state.session_id
+                    st.session_state.question_count
                 )
                 st.session_state.conversation.append(coach_response)
 
@@ -205,7 +204,7 @@ def generate_first_question():
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            first_question = generate_coach_response([], st.session_state.current_stage, 0, st.session_state.session_id)
+            first_question = generate_coach_response([], st.session_state.current_stage, 0)
             if first_question:
                 st.session_state.conversation.append(first_question)
                 return
