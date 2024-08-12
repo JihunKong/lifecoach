@@ -99,6 +99,7 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         이전 대화: {conversation[-5:] if len(conversation) > 5 else conversation}
         사용자의 유사한 과거 대화를 기반으로 자연스럽고 공감적인 응답을 생성하세요.
         그 후, 현재 단계와 관련된 하나의 후속 질문을 하되, 이전 질문들과 중복되지 않고 대화의 흐름에 자연스럽게 이어지도록 하세요.
+        만약 현재 단계의 목표가 충분히 달성되었다고 판단되면, 사용자에게 지금까지의 대화를 요약하고 다음 단계로 넘어갈 준비가 되었는지 물어보세요.
         
         다음 지침을 따르세요:
         1. 응답은 한국어로 작성하고, 레이블이나 마커 없이 자연스럽게 흘러가야 합니다.
@@ -110,7 +111,6 @@ def generate_coach_response(conversation, current_stage, question_count, usernam
         응답 형식:
         [코치의 응답]
         """
-        만약 현재 단계의 목표가 충분히 달성되었다고 판단되면, 사용자에게 지금까지의 대화를 요약하고 다음 단계로 넘어갈 준비가 되었는지 물어보세요.
         
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
